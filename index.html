@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLAAI Hotel Group — กระแสเงินสด &amp; ประมาณการ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f3f1ec;--card:#ffffff;--ink:#1c2536;--muted:#7a8397;--line:#e7e2d8;
+  --pos:#1b7a4b;--neg:#c0392b;
+  --navy:#16233d;--navy2:#243f66;--gold:#b28e4c;--gold-soft:#f3ead6;
+  --accent:#243f66;
+  --forecast-bg:#fdf3e0;--forecast-ink:#a9741f;--forecast-line:#eccf95;
+}
+*{box-sizing:border-box;}
+body{margin:0;font-family:'Segoe UI',system-ui,'Noto Sans Thai',sans-serif;background:var(--bg);color:var(--ink);font-size:15.5px;line-height:1.5;}
+header{background:linear-gradient(120deg,var(--navy),var(--navy2));color:#fff;padding:16px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:20;box-shadow:0 2px 10px rgba(20,30,60,.18);border-bottom:3px solid var(--gold);}
+header .brand{display:flex;align-items:center;gap:12px;}
+header .mark{width:40px;height:40px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+header h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.06em;}
+header .sub{font-size:12.5px;opacity:.82;letter-spacing:.02em;margin-top:2px;}
+.asofbar{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.asofbox{font-size:13px;background:rgba(255,255,255,.12);padding:8px 14px;border-radius:10px;display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.15);}
+.asofbox .lbl{opacity:.85;}
+.asofbox b{color:var(--gold-soft);}
+.asofbox input[type=date]{border:none;border-radius:6px;padding:4px 6px;font-family:inherit;font-size:12.5px;}
+.asofbox label{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px;}
+.syncbox{font-size:12.5px;background:rgba(255,255,255,.12);padding:6px 12px;border-radius:20px;cursor:pointer;border:1px solid rgba(255,255,255,.15);}
+.syncdot{width:9px;height:9px;border-radius:50%;background:#94a3b8;display:inline-block;margin-right:6px;}
+nav{display:flex;gap:6px;background:#fff;padding:9px 14px;flex-wrap:wrap;border-bottom:1px solid var(--line);position:sticky;top:60px;z-index:19;box-shadow:0 1px 3px rgba(0,0,0,.03);}
+nav button{border:1px solid transparent;background:#f0ede6;color:var(--ink);padding:9px 16px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;transition:.15s;}
+nav button:hover{background:#e7e2d8;}
+nav button.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+main{padding:20px;max-width:1200px;margin:0 auto;}
+.card{background:var(--card);border-radius:16px;padding:22px;box-shadow:0 2px 10px rgba(28,37,54,.06);margin-bottom:20px;border:1px solid #efece5;}
+h2{font-size:18px;margin:0 0 6px;font-weight:700;}
+.hint{font-size:13px;color:var(--muted);margin:0 0 16px;line-height:1.7;}
+table{border-collapse:collapse;width:100%;font-size:14px;}
+th,td{padding:9px 11px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card);}
+thead th{background:#faf8f3;font-weight:700;color:#5f6980;border-bottom:2px solid var(--line);font-size:13px;}
+.tblwrap{overflow-x:auto;border-radius:10px;}
+tr.total td{font-weight:800;border-top:2px solid var(--navy);background:#faf8f3;}
+td.pos{color:var(--pos);} td.neg{color:var(--neg);}
+input.cell{width:100px;border:1px solid transparent;background:#f3f1ec;border-radius:7px;padding:7px 8px;text-align:right;font-family:inherit;font-size:14px;color:var(--ink);}
+input.cell:focus{border-color:var(--gold);background:#fff;outline:none;}
+input.cell.forecast{background:var(--forecast-bg);color:var(--forecast-ink);font-style:italic;border-color:var(--forecast-line);}
+.pill{display:inline-block;font-size:12px;padding:3px 10px;border-radius:20px;background:#f0ede6;color:var(--muted);vertical-align:middle;}
+.yrtabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.yrtabs button{border:1px solid var(--line);background:#fff;padding:8px 18px;border-radius:9px;cursor:pointer;font-weight:600;font-family:inherit;font-size:14px;}
+.yrtabs button.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:820px){.grid2{grid-template-columns:1fr;}}
+.kpi{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;}
+.kpi .box{flex:1;min-width:165px;background:#faf8f3;border-radius:12px;padding:14px 16px;border:1px solid var(--line);border-left:4px solid var(--gold);}
+.kpi .box .lbl{font-size:12.5px;color:var(--muted);font-weight:600;}
+.kpi .box .val{font-size:23px;font-weight:800;margin-top:5px;letter-spacing:-.01em;}
+.kpi .box .cap{font-size:11.5px;color:var(--muted);margin-top:3px;}
+.fxrow{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+.fxrow input[type=text]{flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;}
+.fxrow input[type=number]{width:130px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;text-align:right;font-size:14px;}
+.fxrow select{padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;}
+button.mini{border:none;background:#f0ede6;padding:9px 15px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;font-size:13px;}
+button.mini.primary{background:var(--navy);color:#fff;}
+button.mini.gold{background:var(--gold);color:#fff;}
+button.mini.danger{background:#fbe4e0;color:#a13223;}
+.growthbox{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:#faf6ee;border:1px solid #ece2cd;border-radius:12px;padding:12px 16px;margin-bottom:16px;}
+.growthbox label{font-size:13.5px;font-weight:600;}
+.growthbox input{width:80px;padding:7px;border:1px solid var(--line);border-radius:7px;text-align:right;font-family:inherit;font-size:14px;}
+.legend{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.8;}
+.legend b{color:var(--forecast-ink);}
+details{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:0 14px;background:#fcfbf8;}
+details[open]{padding-bottom:14px;}
+summary{cursor:pointer;font-weight:700;color:var(--navy);font-size:14px;padding:13px 0;}
+.subeditor{background:#faf8f3;border:1px dashed #dcd6c8;border-radius:12px;padding:14px 16px;margin:14px 0;}
+.subeditor h3{margin:0 0 4px;font-size:14.5px;}
+.subeditor .subtotal{font-size:13px;color:var(--muted);margin-top:8px;}
+.subeditor .subtotal b{color:var(--ink);font-size:15px;}
+.setupbox{background:#faf6ee;border:1px solid #ece2cd;border-radius:12px;padding:16px;font-size:13.5px;line-height:1.9;}
+code{background:#f0ede6;padding:1px 6px;border-radius:4px;font-size:12.5px;}
+.callout{background:#eef4fb;border:1px solid #cfe0f2;border-radius:12px;padding:13px 16px;font-size:13.5px;line-height:1.7;margin-bottom:16px;color:#26456e;}
+.callout b{color:var(--navy);}
+.cashpanel{border-radius:14px;padding:18px 20px;margin:16px 0;border:2px solid;}
+.cashpanel.pos{background:#eaf6ef;border-color:#bfe3cd;}
+.cashpanel.neg{background:#fdecea;border-color:#f3c9c2;}
+.cashpanel .verdict{font-size:19px;font-weight:800;margin-bottom:14px;letter-spacing:.01em;}
+.cashpanel.pos .verdict{color:#12603a;}
+.cashpanel.neg .verdict{color:#8a2a1c;}
+.cashcalc{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;}
+.cashcalc .item{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;flex:1;min-width:150px;}
+.cashcalc .item.result{border-width:2px;}
+.cashcalc .item .lbl{font-size:12px;color:var(--muted);line-height:1.4;min-height:32px;}
+.cashcalc .item .num{font-size:22px;font-weight:800;margin-top:4px;letter-spacing:-.01em;}
+.cashcalc .op{display:flex;align-items:center;font-size:24px;font-weight:800;color:#9aa2b1;}
+.cashpanel .note{margin-top:13px;font-size:13.5px;line-height:1.65;}
+@media(max-width:700px){.cashcalc{flex-direction:column;}.cashcalc .op{justify-content:center;}.cashcalc .item{min-width:0;}}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:24px;font-size:14px;opacity:0;transition:.3s;pointer-events:none;z-index:50;box-shadow:0 4px 14px rgba(0,0,0,.2);}
+.toast.show{opacity:1;}
+/* ---- login + roles ---- */
+.userchip{font-size:12.5px;background:rgba(255,255,255,.12);padding:6px 12px;border-radius:20px;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;gap:8px;}
+.userchip .rl{background:var(--gold);color:#1c2536;font-weight:700;padding:1px 8px;border-radius:20px;font-size:11px;}
+.userchip .rl.view{background:#94a3b8;color:#fff;}
+.userchip .out{cursor:pointer;opacity:.85;text-decoration:underline;}
+.viewbadge{display:inline-block;background:#fde68a;color:#8a5a12;font-weight:700;font-size:12px;padding:3px 12px;border-radius:20px;margin-left:8px;}
+.login-overlay{position:fixed;inset:0;z-index:100;background:linear-gradient(120deg,var(--navy),var(--navy2));display:flex;align-items:center;justify-content:center;padding:20px;}
+.login-card{background:#fff;border-radius:18px;padding:30px 30px 26px;width:100%;max-width:390px;box-shadow:0 12px 40px rgba(0,0,0,.3);border-top:4px solid var(--gold);}
+.login-card .mk{width:54px;height:54px;border-radius:13px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;}
+.login-card h2{text-align:center;margin:0 0 2px;font-size:19px;letter-spacing:.05em;color:var(--navy);}
+.login-card .lsub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:20px;}
+.login-card label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px;color:#5f6980;}
+.login-card select,.login-card input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font-family:inherit;font-size:15px;}
+.login-card input:focus,.login-card select:focus{border-color:var(--gold);outline:none;}
+.login-card .go{width:100%;margin-top:18px;padding:12px;border:none;border-radius:9px;background:var(--navy);color:#fff;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit;}
+.login-card .go:hover{background:var(--navy2);}
+.login-card .err{color:var(--neg);font-size:13px;text-align:center;min-height:18px;margin-top:10px;}
+.login-card .hintbox{font-size:12px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.6;}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="mark">🏨</div>
+    <div>
+      <h1>PLAAI HOTEL GROUP</h1>
+      <div class="sub">กระแสเงินสดหลังชำระหนี้ &amp; ค่าใช้จ่ายหลัง GOP · ประมาณการ <span id="fcRange">2026–2028</span></div>
+    </div>
+  </div>
+  <div class="asofbar">
+    <div class="asofbox">
+      <span class="lbl">ข้อมูล ณ วันที่</span>
+      <b id="asofLabel">–</b>
+      <input type="date" id="asofDate" onchange="setAsOfManual(this.value)">
+      <label><input type="checkbox" id="asofAuto" onchange="setAsOfAuto(this.checked)"> อัตโนมัติ</label>
+    </div>
+    <div class="syncbox" id="syncbox" onclick="showTab('setup')"><span class="syncdot" id="syncdot"></span><span id="syncstatus">โหมดออฟไลน์</span></div>
+    <div class="userchip" id="userchip" style="display:none"></div>
+  </div>
+</header>
+<nav id="nav"></nav>
+<main id="main"></main>
+<div class="toast" id="toast"></div>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="mk">🏨</div>
+    <h2>PLAAI HOTEL GROUP</h2>
+    <div class="lsub">เข้าสู่ระบบเพื่อดู/แก้ไขข้อมูล</div>
+    <label for="loginUser">ชื่อผู้ใช้</label>
+    <select id="loginUser"></select>
+    <label for="loginPin">รหัส PIN</label>
+    <input type="password" id="loginPin" inputmode="numeric" autocomplete="off" placeholder="ใส่ PIN" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="go" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <div class="err" id="loginErr"></div>
+    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี/ผู้จัดการโรงแรม = แก้ไขได้ · ผู้ชม = ดูอย่างเดียว</div>
+  </div>
+</div>
+
+<script>
+const SEED = {"hotels": {"prime": {"name": "PLAAI Prime", "color": "#243f66", "gop": {"2025": {"jan": 920964.88, "feb": 1100768.69, "mar": 1435460.93, "apr": 1372317.84, "may": 1540398.6, "jun": 1092871.88, "jul": 1446398.53, "aug": 1498395.59, "sep": 1014401.37, "oct": 1094631.01, "nov": 1046101.6, "dec": 1260928.96}, "2026": {"jan": 1431761.09, "feb": 986235.08, "mar": 1317774.88, "apr": 1146614.03, "may": 1226991.08, "jun": null, "jul": null, "aug": null, "sep": null, "oct": null, "nov": null, "dec": null}}, "growth": {"2026": 0.03, "2027": 0.03, "2028": 0.03}, "fixedCosts": [{"id": "rent", "name": "ค่าเช่าอาคาร (Building Rent)", "mode": "monthly", "amount": 500000, "pinnedMonth": "jan"}, {"id": "tax", "name": "ภาษีที่ดิน/ป้าย (Property/Signage Tax)", "mode": "provision", "amount": 75000, "pinnedMonth": "jan"}]}, "play": {"name": "PLAAI Play", "color": "#1b7a4b", "gop": {"2025": {"jan": 196389.3, "feb": 213444.55, "mar": 273447.81, "apr": 254541.64, "may": 323623.36, "jun": 150644.62, "jul": 301545.15, "aug": 221219.67, "sep": 90656.23, "oct": null, "nov": 272565.54, "dec": 289729.35}, "2026": {"jan": 305086.0, "feb": 206091.25, "mar": 283192.46, "apr": 294333.41, "may": 316359.92, "jun": null, "jul": null, "aug": null, "sep": null, "oct": null, "nov": null, "dec": null}}, "growth": {"2026": 0.03, "2027": 0.03, "2028": 0.03}, "fixedCosts": [{"id": "rent", "name": "ค่าเช่าอาคาร (Building Rent)", "mode": "monthly", "amount": 200000, "pinnedMonth": "jan"}, {"id": "house", "name": "ค่าบ้าน (ย้ายมาให้ Play จ่าย)", "mode": "monthly", "amount": 0, "pinnedMonth": "jan"}]}, "saroj": {"name": "PLAAI Plus สาโรจน์ (ระยอง)", "color": "#b28e4c", "gop": {"2025": {"jan": 554913.09, "feb": 573069.65, "mar": 850939.21, "apr": 712552.17, "may": 967161.23, "jun": 544173.79, "jul": 679453.34, "aug": 708754.89, "sep": 618273.41, "oct": 673698.31, "nov": 644682.07, "dec": 609972.42}, "2026": {"jan": 654016.84, "feb": 552552.14, "mar": 811447.99, "apr": 837200.22, "may": 939784.54, "jun": null, "jul": null, "aug": null, "sep": null, "oct": null, "nov": null, "dec": null}}, "growth": {"2026": 0.03, "2027": 0.03, "2028": 0.03}, "fixedCosts": [{"id": "landrent", "name": "ค่าเช่าที่ดิน + ภาษีที่ดิน/ป้าย", "mode": "monthly", "amount": 105708, "pinnedMonth": "jan"}]}, "bowin": {"name": "PLAAI Plus บ่อวิน", "color": "#c0392b", "gop": {"2025": {"jan": 1482394.35, "feb": 1486354.16, "mar": 1909863.75, "apr": 1749864.51, "may": 1810820.72, "jun": 1836774.28, "jul": 1780646.95, "aug": 1956332.92, "sep": 1755776.42, "oct": 1751164.36, "nov": 1876751.87, "dec": 1816994.21}, "2026": {"jan": 1853777.43, "feb": 855221.76, "mar": 1976813.64, "apr": 1589927.29, "may": 2129920.3, "jun": null, "jul": null, "aug": null, "sep": null, "oct": null, "nov": null, "dec": null}}, "growth": {"2026": 0.03, "2027": 0.03, "2028": 0.03}, "fixedCosts": [{"id": "other", "name": "ค่าใช้จ่ายนอกการดำเนินงานอื่นๆ (ที่เป็นเงินสด)", "mode": "monthly", "amount": 0, "pinnedMonth": "jan"}]}, "bowin2": {"name": "PLAAI Plus บ่อวิน 2 (กำลังก่อสร้าง)", "color": "#7c3aed", "underConstruction": true, "openMonth": "2027-02", "gop": {"2025": {"jan": null, "feb": null, "mar": null, "apr": null, "may": null, "jun": null, "jul": null, "aug": null, "sep": null, "oct": null, "nov": null, "dec": null}, "2026": {"jan": null, "feb": null, "mar": null, "apr": null, "may": null, "jun": null, "jul": null, "aug": null, "sep": null, "oct": null, "nov": null, "dec": null}}, "growth": {"2026": 0.0, "2027": 0.0, "2028": 0.05}, "fixedCosts": [{"id": "rent", "name": "ค่าเช่า/ที่ดิน (ประมาณการ)", "mode": "monthly", "amount": 0, "pinnedMonth": "jan"}]}}, "debtCurrent": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000, "bowin2": 0}, "debtBalanceStart": {"play": 4720000, "saroj": 34399092.7, "bowin": 99411525.63, "prime": 32311620.07, "bowin2": 0}, "settings": {"openingCash": {"prime": 0, "play": 0, "saroj": 0, "bowin": 0, "bowin2": 0}, "years": ["2026", "2027", "2028"]}, "construction": {"sources": [{"id": "s1", "name": "วงเงินก่อสร้างจากธนาคาร (Bank Construction Loan)", "amount": 0}, {"id": "s2", "name": "เงินยืมจากโรงแรม Plaai Plus บ่อวิน", "amount": 0}, {"id": "s3", "name": "เงินยืมจาก Owner (ยืมสุทธิ = ยืม − คืน)", "amount": 0}], "ownerLoan": {"borrowed": 0, "returned": 0}, "uses": [{"id": "u1", "name": "ค่าก่อสร้าง (Construction)", "amount": 0}, {"id": "u2", "name": "เงินให้โรงแรมยืมหมุนเวียน (Hotel borrows from construction fund)", "amount": 0}, {"id": "u3", "name": "ค่าที่ดิน / ค่าตกแต่ง (Land / FF&E)", "amount": 0}, {"id": "u4", "name": "สำรอง / อื่นๆ (Reserve / Other)", "amount": 0}]}, "debtSchedule": {"2026": {"jan": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "feb": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "mar": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "apr": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "may": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "jun": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "jul": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "aug": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "sep": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "oct": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "nov": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "dec": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}}, "2027": {"jan": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "feb": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "mar": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "apr": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "may": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "jun": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "jul": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "aug": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1285000}, "sep": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1240429}, "oct": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1230000}, "nov": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1230000}, "dec": {"play": 256000, "saroj": 850000, "bowin": 1460306, "prime": 1230000}}, "2028": {"jan": {"play": 115715, "saroj": 850000, "bowin": 1460306, "prime": 1230000}, "feb": {"play": 0, "saroj": 850000, "bowin": 1460306, "prime": 1230000}, "mar": {"play": 0, "saroj": 850000, "bowin": 1460306, "prime": 1230000}, "apr": {"play": 0, "saroj": 850000, "bowin": 1361347, "prime": 1230000}, "may": {"play": 0, "saroj": 850000, "bowin": 1321800, "prime": 1230000}, "jun": {"play": 0, "saroj": 850000, "bowin": 1321800, "prime": 549952}, "jul": {"play": 0, "saroj": 850000, "bowin": 1321800, "prime": 230000}, "aug": {"play": 0, "saroj": 850000, "bowin": 1321800, "prime": 230000}, "sep": {"play": 0, "saroj": 850000, "bowin": 1321800, "prime": 230000}, "oct": {"play": 0, "saroj": 850000, "bowin": 1321800, "prime": 230000}, "nov": {"play": 0, "saroj": 850000, "bowin": 1321800, "prime": 230000}, "dec": {"play": 0, "saroj": 850000, "bowin": 1321800, "prime": 230000}}, "_names": {"Play": "play", "Saroj": "saroj", "Bowin": "bowin", "Prime": "prime"}}};
+const MONTHS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+const MONTH_TH={jan:'ม.ค.',feb:'ก.พ.',mar:'มี.ค.',apr:'เม.ย.',may:'พ.ค.',jun:'มิ.ย.',jul:'ก.ค.',aug:'ส.ค.',sep:'ก.ย.',oct:'ต.ค.',nov:'พ.ย.',dec:'ธ.ค.'};
+const HOTEL_ORDER=['prime','play','saroj','bowin','bowin2'];
+const YEARS=['2026','2027','2028'];
+
+// ---------- Supabase config: วางค่าจาก Supabase → Project Settings → API ----------
+const SUPABASE_URL = "https://qlnndvycciihakzuxzjf.supabase.co";// เช่น https://xxxxxxxx.supabase.co
+const SUPABASE_ANON_KEY = "sb_publishable_OqQmlwGTDMioAVb6VKFpMg_w6o9JUU1";   // วาง Publishable key (ขึ้นต้น sb_publishable_...) หรือ anon key เดิมถ้ามี
+const SUPABASE_TABLE = "plaai_state";
+const STATE_ID = "main";
+// ---------------------------------------------------------------------------------
+
+// ========== ผู้ใช้ + สิทธิ์ (แก้ชื่อ/PIN ได้ตรงนี้) ==========
+// role: 'owner' | 'accountant' | 'manager' = แก้ไขได้  ·  'viewer' = ดูอย่างเดียว
+// เปลี่ยน PIN ให้ทีมแต่ละคนตามต้องการ (ห้ามซ้ำกัน แนะนำ 4-6 หลัก)
+const USERS = [
+  {name:"เจ้าของกิจการ (Owner)",       pin:"1111", role:"owner"},
+  {name:"ฝ่ายบัญชี (Accounting)",       pin:"2222", role:"accountant"},
+  {name:"ผู้จัดการโรงแรม 1 (Manager)",  pin:"3333", role:"manager"},
+  {name:"ผู้จัดการโรงแรม 2 (Manager)",  pin:"4444", role:"manager"},
+  {name:"ผู้จัดการโรงแรม 3 (Manager)",  pin:"5555", role:"manager"},
+  {name:"ผู้ชม (Viewer)",               pin:"6666", role:"viewer"}
+];
+const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม",viewer:"ดูอย่างเดียว"};
+const EDIT_ROLES=["owner","accountant","manager"];
+let currentUser=null, canEdit=false;
+// =============================================================
+
+let state = loadLocal() || JSON.parse(JSON.stringify(SEED));
+migrate();
+let currentTab='combined';
+let currentYear={};HOTEL_ORDER.forEach(h=>currentYear[h]='2026');
+let charts={};
+let sb=null, applyingRemote=false;
+
+function fmt(n){ if(n===null||n===undefined||isNaN(n)) return '–'; return Math.round(n).toLocaleString('en-US'); }
+function fmt0(n){ return (n<0?'-':'')+Math.abs(Math.round(n)).toLocaleString('en-US'); }
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+// ---------- one-time migration: add debt line items + as-of date ----------
+// monthly-recurring portion only (per-month all-year items)
+function baseDebt(h){ return (state.hotels[h].debtItems||[]).reduce((s,x)=>s+((x.mode==='pinned')?0:(+x.amount||0)),0); }
+function migrate(){
+  let addedItems=false;
+  HOTEL_ORDER.forEach(h=>{
+    if(!state.hotels[h].debtItems){
+      const jan=state.debtSchedule && state.debtSchedule['2026'] && state.debtSchedule['2026']['jan'];
+      const base=(jan && jan[h]!=null)? +jan[h] : 0;
+      state.hotels[h].debtItems=[{id:'loan',name:'ชำระหนี้ธนาคาร (เงินต้น+ดอกเบี้ย)',amount:base,mode:'monthly',pinnedMonth:'jan'}];
+      addedItems=true;
+    }
+    // backfill mode fields on existing items
+    state.hotels[h].debtItems.forEach(di=>{ if(!di.mode) di.mode='monthly'; if(!di.pinnedMonth) di.pinnedMonth='jan'; });
+  });
+  // Sparse-ify the debt schedule so line items drive the "normal" months,
+  // while loan-end reductions stay as explicit month overrides.
+  if(addedItems){
+    HOTEL_ORDER.forEach(h=>{
+      const base=baseDebt(h);
+      Object.keys(state.debtSchedule).forEach(y=>{
+        if(!/^\d{4}$/.test(y)) return;
+        const dy=state.debtSchedule[y];
+        MONTHS.forEach(m=>{ if(dy[m] && dy[m][h]!=null && +dy[m][h]===base) delete dy[m][h]; });
+      });
+    });
+  }
+  if(!state.dataAsOf) state.dataAsOf={mode:'auto',date:todayStr()};
+  if(!state.settings) state.settings={};
+  if(!Array.isArray(state.settings.years)||!state.settings.years.length) state.settings.years=['2026','2027','2028'];
+  if(!state.settings.openingCash) state.settings.openingCash={};
+  HOTEL_ORDER.forEach(h=>{ if(state.settings.openingCash[h]==null) state.settings.openingCash[h]=0; });
+}
+// forecast years (editable/growable), always sorted ascending
+function forecastYears(){ return (state.settings.years||['2026','2027','2028']).slice().sort((a,b)=>(+a)-(+b)); }
+function maxForecastYear(){ const ys=forecastYears(); return Math.max(...ys.map(Number)).toString(); }
+
+// ---------- as-of date (controls forecast → normal colouring) ----------
+function effAsOf(){
+  const da=state.dataAsOf||{mode:'auto',date:todayStr()};
+  const ds=(da.mode==='auto')? todayStr() : (da.date||todayStr());
+  const [y,m]=ds.split('-'); return {ymd:ds,year:parseInt(y),mi:parseInt(m)-1};
+}
+function withinAsOf(year,month){
+  const a=effAsOf(); const y=parseInt(year); const mi=MONTHS.indexOf(month);
+  return y<a.year || (y===a.year && mi<=a.mi);
+}
+function thaiDate(ds){
+  const [y,m,d]=ds.split('-'); const mth=MONTHS[parseInt(m)-1];
+  return parseInt(d)+' '+MONTH_TH[mth]+' '+y;
+}
+function renderAsOf(){
+  const a=effAsOf(); const da=state.dataAsOf;
+  const lbl=document.getElementById('asofLabel');
+  const inp=document.getElementById('asofDate');
+  const chk=document.getElementById('asofAuto');
+  if(!lbl) return;
+  lbl.textContent=thaiDate(a.ymd)+(da.mode==='auto'?' (อัตโนมัติ)':'');
+  chk.checked=(da.mode==='auto'); chk.disabled=!canEdit;
+  inp.value=a.ymd; inp.disabled=(da.mode==='auto')||!canEdit;
+  inp.style.display=(da.mode==='auto')?'none':'inline-block';
+}
+function setAsOfAuto(on){
+  if(ro())return;
+  state.dataAsOf.mode=on?'auto':'manual';
+  if(!on) state.dataAsOf.date=state.dataAsOf.date||todayStr();
+  save(); renderAsOf(); render();
+}
+function setAsOfManual(v){ if(ro())return; if(!v)return; state.dataAsOf.mode='manual'; state.dataAsOf.date=v; save(); renderAsOf(); render(); }
+
+// ---------- GOP resolver (actual or forecast from prior year * growth) ----------
+function gopRaw(h,year,month){
+  const g=state.hotels[h].gop;
+  if(g[year] && g[year][month]!==null && g[year][month]!==undefined && g[year][month]!=='') return {v:+g[year][month],actual:true};
+  return null;
+}
+function resolveGOP(h,year,month){
+  const direct=gopRaw(h,year,month);
+  if(direct) return direct;
+  const py=(parseInt(year)-1).toString();
+  const growth=(state.hotels[h].growth&&state.hotels[h].growth[year]!=null)?+state.hotels[h].growth[year]:0;
+  let base;
+  if(py==='2025'){ const b=gopRaw(h,'2025',month); base=b?b.v:null; }
+  else { const r=resolveGOP(h,py,month); base=r?r.v:null; }
+  if(base===null) return {v:null,actual:false};
+  return {v:base*(1+growth),actual:false};
+}
+function debtForMonth(h,month){
+  let sum=0;
+  (state.hotels[h].debtItems||[]).forEach(di=>{
+    const a=+di.amount||0;
+    if(di.mode==='pinned'){ if(di.pinnedMonth===month) sum+=a; }
+    else sum+=a; // monthly (per-month all year)
+  });
+  return sum;
+}
+function debtService(h,year,month){
+  const d=state.debtSchedule[year];
+  if(d && d[month] && d[month][h]!=null) return +d[month][h];  // month override (typed in cell)
+  return debtForMonth(h,month);                                // else from debt line items
+}
+function fixedForMonth(h,year,month){
+  let sum=0;
+  (state.hotels[h].fixedCosts||[]).forEach(fc=>{
+    const a=+fc.amount||0;
+    if(fc.mode==='monthly') sum+=a;
+    else if(fc.mode==='provision') sum+=a/12;
+    else if(fc.mode==='pinned' && fc.pinnedMonth===month) sum+=a;
+  });
+  return sum;
+}
+function netCF(h,year,month){
+  const g=resolveGOP(h,year,month).v||0;
+  return g - debtService(h,year,month) - fixedForMonth(h,year,month);
+}
+// ---------- cash-on-hand anchor + threaded cumulative cash ----------
+function cashNowVal(h){
+  const v=state.hotels[h] && state.hotels[h].cashNow;
+  return (v===undefined||v===null||v==='')?null:(+v);
+}
+function anchorInfo(h){
+  const cn=cashNowVal(h);
+  if(cn===null) return {has:false};
+  const a=effAsOf();
+  return {has:true,year:a.year,mi:a.mi,value:cn};
+}
+// end-of-month cumulative cash for a whole year, threaded from the cash-on-hand anchor
+function cumulativeSeries(h,yr){
+  const y=parseInt(yr);
+  const open0=+(state.settings.openingCash[h]||0);
+  const an=anchorInfo(h);
+  // no anchor OR viewing a year before the anchor → original per-year behaviour
+  if(!an.has || y<an.year){
+    let run=open0,arr=[];MONTHS.forEach(mo=>{run+=netCF(h,yr,mo);arr.push(run);});
+    return {arr,opening:open0,anchored:false,anchorMi:-1};
+  }
+  if(y===an.year){
+    let run=open0,arr=[];
+    MONTHS.forEach((mo,idx)=>{ if(idx===an.mi) run=an.value; run+=netCF(h,yr,mo); arr.push(run); });
+    return {arr,opening:open0,anchored:true,anchorMi:an.mi};
+  }
+  // y>an.year → opening = projected cumulative at end of prior year, threaded from anchor
+  let run=an.value;
+  for(let idx=an.mi;idx<12;idx++) run+=netCF(h,String(an.year),MONTHS[idx]);
+  for(let yy=an.year+1;yy<y;yy++) MONTHS.forEach(mo=>run+=netCF(h,String(yy),mo));
+  const opening=run;let arr=[];run=opening;
+  MONTHS.forEach(mo=>{run+=netCF(h,yr,mo);arr.push(run);});
+  return {arr,opening,anchored:true,anchorMi:-1};
+}
+// yearMode: how the displayed year relates to "today"
+function yearMode(yr){
+  const a=effAsOf();const y=parseInt(yr);
+  if(y===a.year) return 'anchor'; if(y>a.year) return 'future'; return 'past';
+}
+// cash position for one hotel & year → {start, net, end, worst, mode, cashNowSet}
+function cashPosition(h,yr){
+  const cs=cumulativeSeries(h,yr);
+  const a=effAsOf();const cn=cashNowVal(h);const oc=+(state.settings.openingCash[h]||0);
+  const mode=yearMode(yr);
+  let start,net;
+  if(mode==='anchor'){
+    start=(cn!==null?cn:oc); net=0;
+    for(let i=a.mi;i<12;i++) net+=netCF(h,yr,MONTHS[i]);
+  } else if(mode==='future'){
+    start=cs.opening; net=0; MONTHS.forEach(m=>net+=netCF(h,yr,m));
+  } else {
+    start=oc; net=0; MONTHS.forEach(m=>net+=netCF(h,yr,m));
+  }
+  const end=cs.arr[11];
+  const worstArr=(mode==='anchor')?cs.arr.slice(a.mi):cs.arr;
+  return {start,net,end,worst:Math.min(...worstArr),mode,cashNowSet:cn!==null};
+}
+// build the plain-language cash panel (used by hotel + combined views)
+function cashPanelHTML(p){
+  const {start,net,end,worst,mode,cashNowSet,yr,scope}=p;
+  const short=end<0;const a=effAsOf();
+  const col=n=>n>=0?'var(--pos)':'var(--neg)';
+  let startLabel,netLabel;
+  if(mode==='anchor'){ startLabel=`💵 เงินสดที่มีอยู่ตอนนี้ (${MONTH_TH[MONTHS[a.mi]]} ${a.year})`; netLabel=`เงินสดที่จะได้/ต้องจ่ายต่อจากนี้ (${MONTH_TH[MONTHS[a.mi]]}–ธ.ค.${(''+yr).slice(2)})`; }
+  else if(mode==='future'){ startLabel=`เงินสดยกมาต้นปี ${yr} (ต่อเนื่องคาดการณ์)`; netLabel=`เงินสดสุทธิทั้งปี ${yr}`; }
+  else { startLabel=`เงินสดตั้งต้นปี ${yr}`; netLabel=`เงินสดสุทธิทั้งปี ${yr}`; }
+  let note=short
+    ? `💡 ${scope}<b style="color:#8a2a1c">ต้องหาเงินมาเติมอีกประมาณ ${fmt0(Math.abs(end))} บาท</b> ก่อนสิ้นปี ${yr} (เช่น เงินกู้ / เงินยืม / เลื่อน-ปรับแผนชำระหนี้)`
+    : `💡 ${scope}สิ้นปี ${yr} คาดว่าจะมีเงินสดเหลือ <b style="color:#12603a">${fmt0(end)} บาท</b>`;
+  if(!short && worst<0) note+=` · <span style="color:#8a2a1c">แต่ระหว่างปีเงินสดเคยลงต่ำสุดถึง <b>${fmt0(worst)}</b> ควรกันเงินสำรองไว้ช่วงนั้น</span>`;
+  if(mode==='anchor' && cashNowSet===false) note+=` · <span style="color:#8a5a12">ℹ️ ยังไม่ได้ใส่ "เงินสดที่มีอยู่ตอนนี้" (ใส่ในช่องด้านล่างเพื่อความแม่นยำ)</span>`;
+  return `<div class="cashpanel ${short?'neg':'pos'}">
+    <div class="verdict">${short?'⚠️ เงินสดไม่พอ — คาดว่าจะติดลบ':'✅ เงินสดพอ — เหลือเป็นบวก'}</div>
+    <div class="cashcalc">
+      <div class="item"><div class="lbl">${startLabel}</div><div class="num" style="color:${col(start)}">${fmt0(start)}</div></div>
+      <div class="op">+</div>
+      <div class="item"><div class="lbl">${netLabel}</div><div class="num" style="color:${col(net)}">${fmt0(net)}</div></div>
+      <div class="op">=</div>
+      <div class="item result" style="border-color:${col(end)}"><div class="lbl">เงินสดคงเหลือสิ้นปี ${yr} (คาดการณ์)</div><div class="num" style="color:${col(end)};font-size:26px">${fmt0(end)}</div></div>
+    </div>
+    <div class="note">${note}</div>
+  </div>`;
+}
+
+// ---------- persistence ----------
+function loadLocal(){try{const s=localStorage.getItem('plaai_state');return s?JSON.parse(s):null;}catch(e){return null;}}
+let saveTimer=null;
+function save(){
+  state.updatedAt=Date.now();
+  try{localStorage.setItem('plaai_state',JSON.stringify(state));}catch(e){}
+  if(sb && !applyingRemote){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(pushRemote,700);
+  }
+}
+function setPath(obj,path,val){
+  let o=obj;for(let i=0;i<path.length-1;i++)o=o[path[i]];o[path[path.length-1]]=val;
+}
+
+// ================= RENDER =================
+function buildNav(){
+  const tabs=[['construction','🏗️ เงินก่อสร้าง'],['combined','📊 ภาพรวม'],
+    ['prime','Prime'],['play','Play'],['saroj','Saroj'],['bowin','Bowin'],['bowin2','Bowin 2'],['setup','⚙️ ตั้งค่า/แชร์']];
+  document.getElementById('nav').innerHTML=tabs.map(t=>`<button data-tab="${t[0]}" class="${t[0]===currentTab?'active':''}" onclick="showTab('${t[0]}')">${t[1]}</button>`).join('');
+}
+function showTab(t){currentTab=t;buildNav();render();window.scrollTo(0,0);}
+
+function render(){
+  const m=document.getElementById('main');
+  if(currentTab==='construction') m.innerHTML=viewConstruction();
+  else if(currentTab==='combined') m.innerHTML=viewCombined();
+  else if(currentTab==='setup') m.innerHTML=viewSetup();
+  else m.innerHTML=viewHotel(currentTab);
+  drawCharts();
+  renderAsOf();
+  const fr=document.getElementById('fcRange');
+  if(fr){const fy=forecastYears();fr.textContent=fy[0]+'–'+fy[fy.length-1];}
+  applyPerms();
+}
+
+// ---- Construction / Funding page ----
+function viewConstruction(){
+  const c=state.construction;
+  c.sources[2].amount=(+c.ownerLoan.borrowed||0)-(+c.ownerLoan.returned||0);
+  const srcTotal=c.sources.reduce((s,x)=>s+(+x.amount||0),0);
+  const useTotal=c.uses.reduce((s,x)=>s+(+x.amount||0),0);
+  const srcRows=c.sources.map((s,i)=>`<div class="fxrow">
+    <input type="text" value="${s.name.replace(/"/g,'&quot;')}" ${i===2?'disabled':''} onchange="editField(['construction','sources',${i},'name'],this.value)">
+    <input type="number" value="${s.amount||0}" ${i===2?'disabled':''} onchange="editField(['construction','sources',${i},'amount'],parseFloat(this.value)||0)">
+  </div>`).join('');
+  const useRows=c.uses.map((u,i)=>`<div class="fxrow">
+    <input type="text" value="${u.name.replace(/"/g,'&quot;')}" onchange="editField(['construction','uses',${i},'name'],this.value)">
+    <input type="number" value="${u.amount||0}" onchange="editField(['construction','uses',${i},'amount'],parseFloat(this.value)||0)">
+    <button class="mini danger" onclick="delItem(['construction','uses'],${i})">ลบ</button>
+  </div>`).join('');
+  return `<div class="card">
+    <h2>🏗️ สรุปเงินก่อสร้าง — สำหรับเจ้าของกิจการ</h2>
+    <p class="hint">ภาพรวมว่าเงินที่เบิกจากธนาคาร (และเงินยืม) เอาไปใช้อะไรบ้าง แก้ไขตัวเลขได้ทุกช่อง กราฟวงกลมอัปเดตอัตโนมัติ</p>
+    <div class="kpi">
+      <div class="box"><div class="lbl">แหล่งเงินรวม (เงินที่หามาได้)</div><div class="val">${fmt(srcTotal)}</div><div class="cap">บาท</div></div>
+      <div class="box"><div class="lbl">ใช้ไปแล้วรวม</div><div class="val">${fmt(useTotal)}</div><div class="cap">บาท</div></div>
+      <div class="box"><div class="lbl">เงินคงเหลือ (หามาได้ − ใช้ไป)</div><div class="val" style="color:${srcTotal-useTotal>=0?'var(--pos)':'var(--neg)'}">${fmt(srcTotal-useTotal)}</div><div class="cap">บาท</div></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <h2 style="font-size:15px">แหล่งเงิน (เงินมาจากไหน)</h2>
+        <p class="hint">1) เงินค่าก่อสร้างจากแบงก์ · 2) เงินยืมจากโรงแรม Plaai Plus บ่อวิน · 3) เงินยืม Owner (คำนวณจากยืม−คืนด้านล่าง)</p>
+        ${srcRows}
+        <div style="background:#eef4fb;border:1px solid #cfe0f2;border-radius:10px;padding:12px;margin-top:6px">
+          <div class="fxrow"><label style="min-width:130px">Owner — ยืมมา</label><input type="number" value="${c.ownerLoan.borrowed||0}" onchange="editField(['construction','ownerLoan','borrowed'],parseFloat(this.value)||0)"></div>
+          <div class="fxrow"><label style="min-width:130px">Owner — คืนไปแล้ว</label><input type="number" value="${c.ownerLoan.returned||0}" onchange="editField(['construction','ownerLoan','returned'],parseFloat(this.value)||0)"></div>
+          <div style="font-size:13px;color:var(--muted)">คงค้าง Owner = <b>${fmt((+c.ownerLoan.borrowed||0)-(+c.ownerLoan.returned||0))}</b> บาท</div>
+        </div>
+        <canvas id="srcPie" height="200" style="margin-top:16px"></canvas>
+      </div>
+      <div>
+        <h2 style="font-size:15px">การใช้เงิน (เงินไปไหน)</h2>
+        <p class="hint">รวมช่อง "เงินให้โรงแรมยืมหมุนเวียน" = ยอดที่โรงแรมต้องยืมจาก construction มาใช้ก่อน เพราะเงินสดขาดมือจากภาระหนี้</p>
+        ${useRows}
+        <button class="mini primary" onclick="addItem(['construction','uses'],{id:'u'+Date.now(),name:'รายการใหม่',amount:0})">+ เพิ่มรายการใช้เงิน</button>
+        <canvas id="usePie" height="200" style="margin-top:16px"></canvas>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---- per-hotel page ----
+function viewHotel(h){
+  const hotel=state.hotels[h];const yr=currentYear[h];
+  const openCash=+(state.settings.openingCash[h]||0);
+  const cashNow=cashNowVal(h);
+  const cs=cumulativeSeries(h,yr);
+  let rows='', tGop=0,tDebt=0,tFix=0,tNet=0;
+  MONTHS.forEach((mo,idx)=>{
+    const r=resolveGOP(h,yr,mo);const gv=r.v;
+    const debt=debtService(h,yr,mo);const fix=fixedForMonth(h,yr,mo);
+    const net=(gv||0)-debt-fix;
+    tGop+=(gv||0);tDebt+=debt;tFix+=fix;tNet+=net;
+    const run=cs.arr[idx];
+    const isAnchor=cs.anchored && cs.anchorMi===idx;
+    const isForecast = (!r.actual) && !withinAsOf(yr,mo);
+    const gopInput=`<input class="cell ${isForecast?'forecast':''}" value="${gv!==null?Math.round(gv):''}" placeholder="${r.actual?'':'ประมาณการ'}" onchange="editGOP('${h}','${yr}','${mo}',this.value)">`;
+    rows+=`<tr${isAnchor?' style="background:#eef4fb"':''}>
+      <td>${MONTH_TH[mo]} ${yr.slice(2)}${isAnchor?' <span class="pill" style="background:#dbeafe;color:#1e40af;font-size:10px">ณ ปัจจุบัน</span>':''}</td>
+      <td>${gopInput}</td>
+      <td><input class="cell" value="${Math.round(debt)}" onchange="editDebt('${h}','${yr}','${mo}',this.value)"></td>
+      <td>${fmt(fix)}</td>
+      <td class="${net>=0?'pos':'neg'}">${fmt0(net)}</td>
+      <td class="${run>=0?'pos':'neg'}">${fmt0(run)}</td>
+    </tr>`;
+  });
+  const run=cs.arr[11];
+  const fy=forecastYears();const maxY=maxForecastYear();
+  const yrbtns=['2025',...fy].map(y=>`<button class="${y===yr?'active':''}" onclick="setYear('${h}','${y}')">${y}${y==='2025'?' (จริง)':''}</button>`).join('')
+    + `<button onclick="addYear('${h}')" title="เพิ่มปีประมาณการถัดไป" style="background:var(--gold-soft);border-color:var(--gold);color:var(--forecast-ink)">+ เพิ่มปี</button>`
+    + (fy.length>1?`<button onclick="delYear('${maxY}','${h}')" title="ลบปี ${maxY}" style="background:#fbe4e0;border-color:#f3c9c2;color:#a13223">− ลบปี ${maxY}</button>`:'');
+  const growth=(hotel.growth&&hotel.growth[yr]!=null)?(hotel.growth[yr]*100):0;
+  const growthUI = yr==='2025' ? '<span class="hint">ปี 2025 = ข้อมูลจริง (Actual) ไม่มี growth</span>' :
+    `<label>อัตราการเติบโตปี ${yr}:</label><input type="number" step="0.5" value="${growth}" onchange="editGrowth('${h}','${yr}',this.value)"> %
+     <span class="hint">ใช้ GOP เดือนเดียวกันของปีก่อน × (1+เติบโต) เป็นฐาน (ฤดูกาลคงอยู่อัตโนมัติ)</span>`;
+  // fixed cost editor
+  const fcRows=(hotel.fixedCosts||[]).map((fc,i)=>`<div class="fxrow">
+     <input type="text" value="${(fc.name||'').replace(/"/g,'&quot;')}" onchange="editFC('${h}',${i},'name',this.value)">
+     <input type="number" value="${fc.amount||0}" onchange="editFC('${h}',${i},'amount',parseFloat(this.value)||0)">
+     <select onchange="editFC('${h}',${i},'mode',this.value)">
+       <option value="monthly" ${fc.mode==='monthly'?'selected':''}>ทุกเดือน</option>
+       <option value="provision" ${fc.mode==='provision'?'selected':''}>เฉลี่ย 12 เดือน</option>
+       <option value="pinned" ${fc.mode==='pinned'?'selected':''}>เดือนเดียว</option>
+     </select>
+     <select onchange="editFC('${h}',${i},'pinnedMonth',this.value)" ${fc.mode==='pinned'?'':'style=visibility:hidden'}>
+       ${MONTHS.map(m=>`<option value="${m}" ${fc.pinnedMonth===m?'selected':''}>${MONTH_TH[m]}</option>`).join('')}
+     </select>
+     <button class="mini danger" onclick="delFC('${h}',${i})">ลบ</button>
+   </div>`).join('');
+  // debt items editor
+  const diRows=(hotel.debtItems||[]).map((di,i)=>`<div class="fxrow">
+     <input type="text" value="${(di.name||'').replace(/"/g,'&quot;')}" onchange="editDebtItem('${h}',${i},'name',this.value)">
+     <input type="number" value="${di.amount||0}" onchange="editDebtItem('${h}',${i},'amount',parseFloat(this.value)||0)">
+     <select onchange="editDebtItem('${h}',${i},'mode',this.value)">
+       <option value="monthly" ${di.mode==='pinned'?'':'selected'}>ทุกเดือนทั้งปี</option>
+       <option value="pinned" ${di.mode==='pinned'?'selected':''}>ระบุเดือนเดียว</option>
+     </select>
+     <select onchange="editDebtItem('${h}',${i},'pinnedMonth',this.value)" ${di.mode==='pinned'?'':'style=visibility:hidden'}>
+       ${MONTHS.map(m=>`<option value="${m}" ${di.pinnedMonth===m?'selected':''}>${MONTH_TH[m]}</option>`).join('')}
+     </select>
+     <button class="mini danger" onclick="delDebtItem('${h}',${i})">ลบ</button>
+   </div>`).join('');
+  const uc = hotel.underConstruction? `<span class="pill" style="background:#ede9fe;color:#6d28d9">กำลังก่อสร้าง · เปิด ~${hotel.openMonth}</span>`:'';
+  const cashPanel = cashPanelHTML(Object.assign(cashPosition(h,yr),{yr,scope:''}));
+  return `<div class="card">
+    <h2>${hotel.name} ${uc}</h2>
+    <div class="yrtabs">${yrbtns}</div>
+    <div class="growthbox">${growthUI}</div>
+    ${cashPanel}
+    <div class="kpi">
+      <div class="box"><div class="lbl">GOP รวมทั้งปี (กำไรก่อนหักหนี้)</div><div class="val">${fmt(tGop)}</div><div class="cap">บาท</div></div>
+      <div class="box"><div class="lbl">ชำระหนี้รวม (เงินต้น+ดอกเบี้ย)</div><div class="val" style="color:var(--neg)">${fmt(tDebt)}</div><div class="cap">บาท</div></div>
+      <div class="box"><div class="lbl">ค่าใช้จ่ายหลัง GOP รวม</div><div class="val" style="color:var(--neg)">${fmt(tFix)}</div><div class="cap">บาท</div></div>
+      <div class="box"><div class="lbl">เงินสดสุทธิทั้งปี = GOP − หนี้ − ค่าใช้จ่าย</div><div class="val" style="color:${tNet>=0?'var(--pos)':'var(--neg)'}">${fmt0(tNet)}</div><div class="cap">บาท</div></div>
+    </div>
+    <div class="tblwrap"><table>
+      <thead><tr><th>เดือน</th><th>GOP<br>(กำไรก่อนหักหนี้)</th><th>ชำระหนี้<br>(ต้น+ดอก)</th><th>ค่าใช้จ่าย<br>หลัง GOP</th><th>เงินสดสุทธิ<br>(เหลือ/ขาด)</th><th>เงินสดสะสม</th></tr></thead>
+      <tbody>${rows}
+      <tr class="total"><td>รวม</td><td>${fmt(tGop)}</td><td>${fmt(tDebt)}</td><td>${fmt(tFix)}</td><td class="${tNet>=0?'pos':'neg'}">${fmt0(tNet)}</td><td class="${run>=0?'pos':'neg'}">${fmt0(run)}</td></tr>
+      </tbody>
+    </table></div>
+    <p class="legend"><b style="background:var(--forecast-bg);padding:2px 8px;border-radius:5px;border:1px solid var(--forecast-line)">สีส้ม/เอียง</b> = ตัวเลขประมาณการ (แก้ทับได้ กลายเป็นตัวเลขจริง) · ช่องขาว = ตัวเลขจริง · เมื่อ "ข้อมูล ณ วันที่" ถึงเดือนใด กล่องสีส้มของเดือนนั้นจะเปลี่ยนเป็นสีปกติอัตโนมัติ · <b style="color:var(--ink)">ชำระหนี้</b> รวมเงินต้น+ดอกเบี้ยแล้ว · ไม่รวมค่าเสื่อมราคา (ไม่ใช่เงินสด)</p>
+    <div class="subeditor">
+      <h3>💳 รายการชำระหนี้ (Loan Payments) — เพิ่ม/ลด/แก้ตัวเลขได้</h3>
+      <p class="hint" style="margin-bottom:10px">แต่ละรายการเลือกได้ 2 แบบ: <b>"ทุกเดือนทั้งปี"</b> (จ่ายเท่ากันทุกเดือน) หรือ <b>"ระบุเดือนเดียว"</b> (เช่น จ่ายก้อนใหญ่ปีละครั้ง — เลือกเดือนที่จ่าย) · ยอดจะไปเข้าช่อง "ชำระหนี้" ให้อัตโนมัติ · หากบางเดือนต่างออกไป (เช่น หนี้ก้อนหนึ่งผ่อนหมด) พิมพ์ทับในช่อง "ชำระหนี้" ของเดือนนั้นในตารางด้านบนได้เลย</p>
+      ${diRows}
+      <button class="mini primary" onclick="addDebtItem('${h}')">+ เพิ่มรายการหนี้</button>
+      <div class="subtotal">รวมหนี้แบบ "ทุกเดือนทั้งปี": <b>${fmt(baseDebt(h))}</b> บาท/เดือน (รายการ "ระบุเดือนเดียว" จะบวกเพิ่มเฉพาะเดือนที่เลือก)</div>
+    </div>
+    <div class="growthbox" style="background:#eef4fb;border-color:#cfe0f2">
+      <label>💵 เงินสดคงเหลือ ณ ปัจจุบัน (Cash on hand):</label>
+      <input type="number" value="${cashNow!==null?cashNow:''}" placeholder="ยังไม่ระบุ" onchange="editCashNow('${h}',this.value)">
+      <button class="mini" onclick="editCashNow('${h}','')" title="ล้างค่า">ล้าง</button>
+      <span class="hint">ใส่ยอดเงินสดจริงที่ตึกนี้มีอยู่ ณ วันที่ในมุมขวาบน · ระบบจะใช้ยอดนี้เป็นจุดตั้งต้นของ "เงินสดสะสม" ตั้งแต่เดือนปัจจุบัน (${MONTH_TH[effAsOf().mi>=0?MONTHS[effAsOf().mi]:'jan']} ${effAsOf().year}) เป็นต้นไป แล้วต่อยอดข้ามปีให้อัตโนมัติ เพื่อวางแผนตามความจริง · ถ้าเว้นว่าง = ใช้ "เงินสดตั้งต้น" ด้านล่างแทน</span>
+    </div>
+    <div class="growthbox" style="background:#faf8f3;border-color:var(--line)">
+      <label>เงินสดตั้งต้น (ยกมาต้นปี) ${yr}:</label>
+      <input type="number" value="${openCash}" onchange="editOpening('${h}',this.value)">
+      <span class="hint">ใช้เป็นจุดตั้งต้นของ "เงินสดสะสม" เฉพาะเมื่อ<b>ไม่ได้</b>ระบุเงินสดคงเหลือ ณ ปัจจุบัน (หรือปีก่อนหน้าเดือนปัจจุบัน)</span>
+    </div>
+    <details><summary>⚙️ แก้ไขค่าใช้จ่ายหลัง GOP</summary>
+      <p class="hint">เลือกได้ว่าจะลงแบบ "ทุกเดือน", "เฉลี่ย 12 เดือน" สำหรับก้อนที่จ่ายปีละครั้ง, หรือ "เดือนเดียว" ในเดือนที่จ่ายจริง · หมายเหตุ: ดอกเบี้ยเงินกู้อยู่ในรายการชำระหนี้แล้ว ไม่ต้องใส่ซ้ำ</p>
+      ${fcRows}
+      <button class="mini primary" onclick="addFC('${h}')">+ เพิ่มค่าใช้จ่ายหลัง GOP</button>
+    </details>
+    <canvas id="hotelChart" height="90" style="margin-top:18px"></canvas>
+  </div>`;
+}
+
+// ---- combined ----
+function viewCombined(){
+  const yr = currentYear['_combined']||'2026';
+  let rows='',tot={gop:0,debt:0,fix:0,net:0};
+  const active=HOTEL_ORDER.filter(h=>!(state.hotels[h].underConstruction && !hasData(h,yr)));
+  const monthNet={};MONTHS.forEach(m=>monthNet[m]=0);
+  MONTHS.forEach(mo=>{
+    let g=0,d=0,f=0;
+    active.forEach(h=>{g+=resolveGOP(h,yr,mo).v||0;d+=debtService(h,yr,mo);f+=fixedForMonth(h,yr,mo);});
+    const net=g-d-f;monthNet[mo]=net;
+    tot.gop+=g;tot.debt+=d;tot.fix+=f;tot.net+=net;
+    rows+=`<tr><td>${MONTH_TH[mo]} ${yr.slice(2)}</td><td>${fmt(g)}</td><td>${fmt(d)}</td><td>${fmt(f)}</td><td class="${net>=0?'pos':'neg'}">${fmt0(net)}</td></tr>`;
+  });
+  let cStart=0,cNet=0,cEnd=0,anyCashNow=false;const monthCum=Array(12).fill(0);
+  let hotelRows=HOTEL_ORDER.map(h=>{
+    let net=0;MONTHS.forEach(mo=>net+=netCF(h,yr,mo));
+    const cn=cashNowVal(h); if(cn!==null) anyCashNow=true;
+    const p=cashPosition(h,yr); cStart+=p.start; cNet+=p.net; cEnd+=p.end;
+    if(active.includes(h)) cumulativeSeries(h,yr).arr.forEach((v,i)=>monthCum[i]+=v);
+    const uc=state.hotels[h].underConstruction?' <span class="pill" style="background:#ede9fe;color:#6d28d9;font-size:10px">กำลังก่อสร้าง</span>':'';
+    return `<tr><td>${state.hotels[h].name}${uc}</td><td class="${cn!==null?(cn>=0?'pos':'neg'):''}">${cn!==null?fmt0(cn):'–'}</td><td class="${net>=0?'pos':'neg'}">${fmt0(net)}</td><td class="${p.end>=0?'pos':'neg'}">${fmt0(p.end)}</td></tr>`;
+  }).join('');
+  const cMode=yearMode(yr);const _a=effAsOf();
+  const cWorst=Math.min(...(cMode==='anchor'?monthCum.slice(_a.mi):monthCum));
+  const combinedPanel=cashPanelHTML({start:cStart,net:cNet,end:cEnd,worst:cWorst,mode:cMode,cashNowSet:anyCashNow,yr,scope:'ทั้งเครือ — '});
+  const fy=forecastYears();const maxY=maxForecastYear();
+  const yrbtns=fy.map(y=>`<button class="${y===yr?'active':''}" onclick="setYear('_combined','${y}');render();">${y}</button>`).join('')
+    + `<button onclick="addYear('_combined')" title="เพิ่มปีประมาณการถัดไป" style="background:var(--gold-soft);border-color:var(--gold);color:var(--forecast-ink)">+ เพิ่มปี</button>`
+    + (fy.length>1?`<button onclick="delYear('${maxY}','_combined')" title="ลบปี ${maxY}" style="background:#fbe4e0;border-color:#f3c9c2;color:#a13223">− ลบปี ${maxY}</button>`:'');
+  return `<div class="card">
+    <h2>📊 ภาพรวมกระแสเงินสดรวมทุกตึก</h2>
+    <p class="hint">สรุปทั้งเครือในหน้าเดียว — เงินสดสุทธิ = GOP − ชำระหนี้ − ค่าใช้จ่ายหลัง GOP · สีเขียว = เหลือ · สีแดง = ขาด</p>
+    <div class="yrtabs">${yrbtns}</div>
+    <div class="kpi">
+      <div class="box"><div class="lbl">GOP รวม (กำไรก่อนหักหนี้)</div><div class="val">${fmt(tot.gop)}</div><div class="cap">บาท/ปี</div></div>
+      <div class="box"><div class="lbl">ชำระหนี้รวม</div><div class="val" style="color:var(--neg)">${fmt(tot.debt)}</div><div class="cap">บาท/ปี</div></div>
+      <div class="box"><div class="lbl">ค่าใช้จ่ายหลัง GOP รวม</div><div class="val" style="color:var(--neg)">${fmt(tot.fix)}</div><div class="cap">บาท/ปี</div></div>
+      <div class="box"><div class="lbl">เงินสดสุทธิรวมทั้งปี</div><div class="val" style="color:${tot.net>=0?'var(--pos)':'var(--neg)'}">${fmt0(tot.net)}</div><div class="cap">บาท/ปี</div></div>
+    </div>
+    ${combinedPanel}
+    <canvas id="combChart" height="90"></canvas>
+    <div class="grid2" style="margin-top:18px">
+      <div class="tblwrap"><table><thead><tr><th>เดือน</th><th>GOP</th><th>ชำระหนี้</th><th>หลัง GOP</th><th>เงินสดสุทธิ</th></tr></thead>
+        <tbody>${rows}<tr class="total"><td>รวม</td><td>${fmt(tot.gop)}</td><td>${fmt(tot.debt)}</td><td>${fmt(tot.fix)}</td><td class="${tot.net>=0?'pos':'neg'}">${fmt0(tot.net)}</td></tr></tbody></table></div>
+      <div><h2 style="font-size:15px">เงินสดรายตึก (ปี ${yr})</h2>
+        <div class="tblwrap"><table><thead><tr><th>โรงแรม</th><th>เงินสด<br>ณ ปัจจุบัน</th><th>เงินสดสุทธิ<br>ทั้งปี</th><th>เงินสด<br>สิ้นปี (คาด)</th></tr></thead><tbody>${hotelRows}</tbody></table></div>
+        <canvas id="hotelBar" height="180" style="margin-top:12px"></canvas>
+      </div>
+    </div>
+  </div>`;
+}
+function hasData(h,yr){return MONTHS.some(m=>resolveGOP(h,yr,m).v!==null);}
+
+// ---- setup ----
+function viewSetup(){
+  const cfgOk=SUPABASE_URL && SUPABASE_ANON_KEY;
+  return `<div class="card">
+    <h2>⚙️ ตั้งค่าการแชร์แบบเรียลไทม์ (Supabase + GitHub)</h2>
+    <p class="hint">สถานะปัจจุบัน: <b>${cfgOk?'เชื่อม Supabase แล้ว':'ยังไม่ได้ตั้งค่า Supabase — ทำงานแบบออฟไลน์ (เก็บในเครื่องนี้เท่านั้น)'}</b></p>
+    <div class="callout">🗓️ <b>วันที่อัปเดตข้อมูล:</b> ปรับได้ที่มุมขวาบน — เปิด "อัตโนมัติ" เมื่อขึ้นออนไลน์ (ระบบจะใช้วันที่ปัจจุบันให้เอง) หรือปิดเพื่อกำหนดวันที่เอง · เมื่อวันที่อัปเดตถึงเดือนใด ตัวเลข GOP ประมาณการ (กล่องสีส้ม) ของเดือนนั้นจะเปลี่ยนเป็นสีปกติอัตโนมัติ</div>
+    <div class="setupbox">
+      <b>ขั้นที่ 1 — สร้างตารางใน Supabase:</b><br>
+      เข้า Supabase → โปรเจกต์ของคุณ → เมนู <b>SQL Editor</b> → วางโค้ดนี้แล้วกด Run:<br>
+      <div style="background:#0f1b2e;color:#dbe7f5;border-radius:8px;padding:12px;margin:8px 0;font-size:12px;line-height:1.6;overflow-x:auto"><code style="background:none;color:inherit;white-space:pre">create table if not exists plaai_state (
+  id text primary key,
+  payload text,
+  updated_at bigint
+);
+alter table plaai_state enable row level security;
+create policy "team access" on plaai_state
+  for all using (true) with check (true);
+alter publication supabase_realtime add table plaai_state;</code></div>
+      <b>ขั้นที่ 2 — คัดลอกค่า API:</b><br>
+      Project Settings (⚙️) → <b>API Keys</b> → คัดลอก <code>Project URL</code> และ <code>Publishable key</code> (ขึ้นต้น <code>sb_publishable_</code>) · ถ้าเป็นโปรเจกต์เก่าที่ยังมี <code>anon public</code> key ก็ใช้ได้เช่นกัน<br>
+      <b>ขั้นที่ 3 — ใส่ค่าในไฟล์:</b><br>
+      เปิด <code>index.html</code> ด้วย Notepad → หาบรรทัด <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> ใกล้ต้นไฟล์ → วางค่า → เซฟ<br>
+      <b>ขั้นที่ 4 — ขึ้น GitHub Pages:</b><br>
+      เปลี่ยนชื่อไฟล์เป็น <code>index.html</code> → push ขึ้น repo → Settings → <b>Pages</b> → Source: <b>Deploy from branch</b> → เลือก <code>main</code> / <code>root</code> → Save · ได้ลิงก์ <code>https://ชื่อคุณ.github.io/ชื่อ-repo/</code> ส่งให้ทีม 5 คน<br>
+      <br>ทุกคนที่เปิดลิงก์เดียวกันจะเห็นและแก้ข้อมูลชุดเดียวกันแบบเรียลไทม์ · ก่อนตั้งค่าเสร็จ ข้อมูลจะเก็บเฉพาะในเครื่องนี้
+      <br><br><b>หมายเหตุความปลอดภัย:</b> policy ด้านบนเปิดให้ใครมี anon key ก็แก้ได้ เหมาะกับทีมภายใน · anon key เปิดเผยได้ตามปกติของ Supabase (ความปลอดภัยจริงอยู่ที่ RLS)
+    </div>
+    <div class="callout" style="margin-top:14px">🔐 <b>ระบบล็อกอิน + สิทธิ์ผู้ใช้ (6 คน):</b> เปิดลิงก์แล้วต้องเลือกชื่อ + ใส่ PIN ก่อน · <b>เจ้าของกิจการ, ฝ่ายบัญชี, ผู้จัดการโรงแรม (5 คน)</b> = แก้ไขข้อมูลได้ทุกตึก · <b>ผู้ชม (1 คน)</b> = ดูได้ทุกหน้าแต่แก้ไม่ได้ (ช่องกรอกจะถูกล็อก) · ทุกคนที่แก้จะซิงก์ให้เห็นตรงกันแบบเรียลไทม์ · <b>แก้ชื่อ/PIN ของแต่ละคน</b> ได้ในไฟล์ <code>index.html</code> ที่ตัวแปร <code>USERS</code> (ใกล้ต้นไฟล์) · ข้อควรทราบ: PIN นี้เป็นการกันแบบเบื้องต้นสำหรับทีมภายใน หากเปิดซอร์สโค้ดจะเห็น PIN ได้ — ถ้าต้องการล็อกอินที่ปลอดภัยจริงจัง (อีเมล+รหัสผ่าน ผ่าน Supabase Auth) แจ้งได้ค่ะ</div>
+    <div style="margin-top:16px">
+      <button class="mini" onclick="exportJSON()">⬇️ Export ข้อมูล (JSON)</button>
+      <button class="mini" onclick="document.getElementById('imp').click()">⬆️ Import ข้อมูล</button>
+      <input type="file" id="imp" style="display:none" accept=".json" onchange="importJSON(this)">
+      <button class="mini danger" onclick="resetAll()">↺ รีเซ็ตกลับค่าตั้งต้น</button>
+    </div>
+    <p class="hint" style="margin-top:14px">ที่มาข้อมูล: GOP จริงรายเดือนปี 2025 (ทั้ง 4 ตึก) + ม.ค.–พ.ค. 2026 · ตารางผ่อนหนี้ 2026–2028 จาก Hotel_Loan_Projection (MLR/MOR BBL) · ค่าเช่า/ภาษี จากงบ below-GOP · บ่อวิน 2 รอข้อมูลเปิด ก.พ. 2027</p>
+  </div>`;
+}
+
+// ================= EDIT HANDLERS =================
+function editGOP(h,y,m,val){if(ro())return;const v=val.trim();state.hotels[h].gop[y]=state.hotels[h].gop[y]||{};state.hotels[h].gop[y][m]=(v===''?null:parseFloat(v.replace(/,/g,''))); save(); render();}
+function editDebt(h,y,m,val){if(ro())return;state.debtSchedule[y]=state.debtSchedule[y]||{};state.debtSchedule[y][m]=state.debtSchedule[y][m]||{};state.debtSchedule[y][m][h]=parseFloat(val.replace(/,/g,''))||0;save();render();}
+function editGrowth(h,y,val){if(ro())return;state.hotels[h].growth=state.hotels[h].growth||{};state.hotels[h].growth[y]=(parseFloat(val)||0)/100;save();render();}
+function editOpening(h,val){if(ro())return;state.settings.openingCash[h]=parseFloat(val)||0;save();render();}
+function editCashNow(h,val){if(ro())return;const v=(val===''||val===null||val===undefined)?null:(parseFloat((''+val).replace(/,/g,''))||0);state.hotels[h].cashNow=v;save();render();}
+function setYear(h,y){currentYear[h]=y;render();}
+function addYear(ctx){
+  if(ro())return;
+  const ys=forecastYears();
+  const next=(Math.max(...ys.map(Number))+1).toString();
+  state.settings.years=ys.concat([next]).sort((a,b)=>(+a)-(+b));
+  HOTEL_ORDER.forEach(h=>{
+    state.hotels[h].growth=state.hotels[h].growth||{};
+    if(state.hotels[h].growth[next]==null){
+      const prev=(parseInt(next)-1).toString();
+      state.hotels[h].growth[next]=(state.hotels[h].growth[prev]!=null)?state.hotels[h].growth[prev]:0.03;
+    }
+  });
+  if(ctx) currentYear[ctx]=next;
+  save();render();toast('เพิ่มปี '+next+' (ประมาณการ) แล้ว');
+}
+function delYear(y,ctx){
+  if(ro())return;
+  const ys=forecastYears();
+  if(ys.length<=1){toast('ต้องมีอย่างน้อย 1 ปีประมาณการ');return;}
+  if(y!==maxForecastYear()){toast('ลบได้เฉพาะปีล่าสุด');return;}
+  if(!confirm('ลบปี '+y+' ออกจากประมาณการ? (ข้อมูลที่กรอกในปีนี้จะถูกลบ)')) return;
+  state.settings.years=ys.filter(x=>x!==y);
+  HOTEL_ORDER.forEach(h=>{
+    if(state.hotels[h].growth) delete state.hotels[h].growth[y];
+    if(state.hotels[h].gop) delete state.hotels[h].gop[y];
+  });
+  if(state.debtSchedule) delete state.debtSchedule[y];
+  const fb=maxForecastYear();
+  Object.keys(currentYear).forEach(k=>{ if(currentYear[k]===y) currentYear[k]=fb; });
+  save();render();toast('ลบปี '+y+' แล้ว');
+}
+function editFC(h,i,field,val){if(ro())return;state.hotels[h].fixedCosts[i][field]=val;save();render();}
+function addFC(h){if(ro())return;state.hotels[h].fixedCosts.push({id:'fc'+Date.now(),name:'รายการใหม่',mode:'monthly',amount:0,pinnedMonth:'jan'});save();render();}
+function delFC(h,i){if(ro())return;state.hotels[h].fixedCosts.splice(i,1);save();render();}
+function editDebtItem(h,i,field,val){if(ro())return;state.hotels[h].debtItems[i][field]=val;save();render();}
+function addDebtItem(h){if(ro())return;state.hotels[h].debtItems=state.hotels[h].debtItems||[];state.hotels[h].debtItems.push({id:'d'+Date.now(),name:'รายการหนี้ใหม่',amount:0,mode:'monthly',pinnedMonth:'jan'});save();render();}
+function delDebtItem(h,i){if(ro())return;state.hotels[h].debtItems.splice(i,1);save();render();}
+function editField(path,val){if(ro())return;setPath(state,path,val);save();render();}
+function addItem(path,item){if(ro())return;let o=state;path.forEach(p=>o=o[p]);o.push(item);save();render();}
+function delItem(path,i){if(ro())return;let o=state;path.forEach(p=>o=o[p]);o.splice(i,1);save();render();}
+function exportJSON(){const b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='plaai_hotel_data.json';a.click();}
+function importJSON(inp){if(ro())return;const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{state=JSON.parse(e.target.result);migrate();save();render();toast('นำเข้าข้อมูลแล้ว');}catch(err){toast('ไฟล์ไม่ถูกต้อง');}};r.readAsText(f);}
+function resetAll(){if(ro())return;if(confirm('รีเซ็ตกลับค่าตั้งต้นทั้งหมด?')){state=JSON.parse(JSON.stringify(SEED));migrate();save();render();}}
+
+// ================= CHARTS =================
+function drawCharts(){
+  Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}});charts={};
+  if(currentTab==='construction'){
+    const c=state.construction;
+    const srcData=c.sources.map(s=>Math.max(0,+s.amount||0));
+    const useData=c.uses.map(u=>Math.max(0,+u.amount||0));
+    if(document.getElementById('srcPie')&&srcData.some(x=>x>0))
+      charts.s=new Chart(srcPie,{type:'doughnut',data:{labels:c.sources.map(s=>s.name),datasets:[{data:srcData,backgroundColor:['#243f66','#c0392b','#1b7a4b']}]},options:pieOpt('แหล่งเงิน')});
+    if(document.getElementById('usePie')&&useData.some(x=>x>0))
+      charts.u=new Chart(usePie,{type:'doughnut',data:{labels:c.uses.map(u=>u.name),datasets:[{data:useData,backgroundColor:['#b28e4c','#7c3aed','#0891b2','#64748b','#db2777','#65a30d']}]},options:pieOpt('การใช้เงิน')});
+  }
+  if(currentTab==='combined'){
+    const yr=currentYear['_combined']||'2026';
+    const active=HOTEL_ORDER.filter(h=>!(state.hotels[h].underConstruction&&!hasData(h,yr)));
+    const net=MONTHS.map(mo=>active.reduce((s,h)=>s+netCF(h,yr,mo),0));
+    if(document.getElementById('combChart'))
+      charts.c=new Chart(combChart,{type:'bar',data:{labels:MONTHS.map(m=>MONTH_TH[m]),datasets:[{label:'เงินสดสุทธิรวม',data:net,backgroundColor:net.map(v=>v>=0?'#1b7a4b':'#c0392b')}]},options:barOpt()});
+    const annual=HOTEL_ORDER.map(h=>MONTHS.reduce((s,mo)=>s+netCF(h,yr,mo),0));
+    if(document.getElementById('hotelBar'))
+      charts.hb=new Chart(hotelBar,{type:'bar',data:{labels:HOTEL_ORDER.map(h=>state.hotels[h].name),datasets:[{label:'เงินสดสุทธิ',data:annual,backgroundColor:HOTEL_ORDER.map(h=>state.hotels[h].color)}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}});
+  }
+  if(['prime','play','saroj','bowin','bowin2'].includes(currentTab)){
+    const h=currentTab,yr=currentYear[h];
+    const gop=MONTHS.map(mo=>resolveGOP(h,yr,mo).v||0);
+    const net=MONTHS.map(mo=>netCF(h,yr,mo));
+    if(document.getElementById('hotelChart'))
+      charts.h=new Chart(hotelChart,{type:'bar',data:{labels:MONTHS.map(m=>MONTH_TH[m]),datasets:[
+        {label:'GOP',data:gop,backgroundColor:'#c9b487'},
+        {type:'line',label:'เงินสดสุทธิ',data:net,borderColor:'#c0392b',backgroundColor:'#c0392b',tension:.3}
+      ]},options:barOpt()});
+  }
+}
+function pieOpt(t){return{plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},title:{display:true,text:t}}};}
+function barOpt(){return{plugins:{legend:{display:true,position:'top'}},scales:{y:{ticks:{callback:v=>fmt(v)}}}};}
+
+// ================= SUPABASE SYNC =================
+function initSupabase(){
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY){setSync('off');return;}
+  const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  s.onload=connectSupabase;
+  s.onerror=()=>setSync('err');
+  document.head.appendChild(s);
+}
+function applyRemote(payload,updated){
+  try{
+    const rs=(typeof payload==='string')?JSON.parse(payload):payload;
+    const remoteUpdated=updated||rs.updatedAt||0;
+    if(!state.updatedAt||remoteUpdated>state.updatedAt){
+      const focused=document.activeElement&&document.activeElement.tagName==='INPUT';
+      applyingRemote=true;state=rs;migrate();localStorage.setItem('plaai_state',JSON.stringify(state));applyingRemote=false;
+      if(!focused){render();renderAsOf();toast('🔄 อัปเดตจากผู้ใช้อื่น');}
+    }
+  }catch(e){console.error(e);}
+}
+function connectSupabase(){
+  try{
+    sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+    setSync('connecting');
+    // 1) ดึงข้อมูลล่าสุดตอนเปิด
+    sb.from(SUPABASE_TABLE).select('payload,updated_at').eq('id',STATE_ID).maybeSingle()
+      .then(({data,error})=>{
+        if(error){console.error(error);setSync('err');return;}
+        if(data && data.payload) applyRemote(data.payload,data.updated_at);
+        else pushRemote();   // ยังไม่มีแถว → สร้างจากข้อมูลในเครื่อง
+        setSync('on');
+      });
+    // 2) ฟังการเปลี่ยนแปลงแบบเรียลไทม์
+    sb.channel('plaai-state-'+STATE_ID)
+      .on('postgres_changes',{event:'*',schema:'public',table:SUPABASE_TABLE,filter:'id=eq.'+STATE_ID},
+        p=>{const row=p.new; if(row && row.payload) applyRemote(row.payload,row.updated_at);})
+      .subscribe(st=>{ if(st==='SUBSCRIBED') setSync('on'); });
+  }catch(e){console.error(e);setSync('err');}
+}
+function pushRemote(){
+  if(!sb || !canEdit)return;
+  sb.from(SUPABASE_TABLE).upsert({id:STATE_ID,payload:JSON.stringify(state),updated_at:state.updatedAt||Date.now()})
+    .then(({error})=>{ if(error) console.error(error); });
+}
+function setSync(st){const dot=document.getElementById('syncdot'),txt=document.getElementById('syncstatus');
+  const map={on:['#22c55e','ซิงก์เรียลไทม์'],connecting:['#f59e0b','กำลังเชื่อม...'],off:['#94a3b8','โหมดออฟไลน์ (คลิกเพื่อตั้งค่า)'],err:['#dc2626','เชื่อมต่อไม่ได้']};
+  dot.style.background=map[st][0];txt.textContent=map[st][1];}
+
+// ================= AUTH / ROLES =================
+// ro() = "read-only guard": ถ้าไม่มีสิทธิ์แก้ไข ให้เตือนแล้วบล็อก
+function ro(){ if(!canEdit){toast('👁️ โหมดดูอย่างเดียว — บัญชีนี้ไม่มีสิทธิ์แก้ไข'); return true;} return false;}
+function setUser(u){
+  currentUser=u; canEdit=EDIT_ROLES.includes(u.role);
+  try{localStorage.setItem('plaai_user',JSON.stringify({name:u.name,role:u.role}));}catch(e){}
+  renderUser();
+}
+function renderUser(){
+  const chip=document.getElementById('userchip'); if(!chip||!currentUser) return;
+  const isView=!canEdit;
+  chip.style.display='flex';
+  chip.innerHTML=`<span>${currentUser.name}</span>`+
+    `<span class="rl ${isView?'view':''}">${ROLE_LABEL[currentUser.role]||currentUser.role}</span>`+
+    `<span class="out" onclick="logout()">ออก</span>`;
+}
+function buildLoginOptions(){
+  const sel=document.getElementById('loginUser'); if(!sel) return;
+  sel.innerHTML=USERS.map((u,i)=>`<option value="${i}">${u.name}</option>`).join('');
+}
+function doLogin(){
+  const sel=document.getElementById('loginUser');
+  const pin=(document.getElementById('loginPin').value||'').trim();
+  const err=document.getElementById('loginErr');
+  const u=USERS[+sel.value];
+  if(!u){err.textContent='ไม่พบผู้ใช้';return;}
+  if(String(u.pin)!==pin){err.textContent='รหัส PIN ไม่ถูกต้อง';return;}
+  err.textContent='';
+  setUser(u);
+  document.getElementById('loginOverlay').style.display='none';
+  startApp();
+}
+function logout(){
+  try{localStorage.removeItem('plaai_user');}catch(e){}
+  currentUser=null; canEdit=false;
+  document.getElementById('userchip').style.display='none';
+  const pin=document.getElementById('loginPin'); if(pin) pin.value='';
+  document.getElementById('loginOverlay').style.display='flex';
+}
+function restoreSession(){
+  try{
+    const s=JSON.parse(localStorage.getItem('plaai_user')||'null');
+    if(s && s.name){ const u=USERS.find(x=>x.name===s.name); if(u){setUser(u);return true;} }
+  }catch(e){}
+  return false;
+}
+// ปิดใช้งานช่องกรอก/ปุ่มแก้ไข เมื่อเป็นผู้ชม (นำทาง/สลับปี/สลับแท็บยังทำได้)
+function applyPerms(){
+  const main=document.getElementById('main'); if(!main) return;
+  const editable=canEdit;
+  main.querySelectorAll('input, select, textarea').forEach(el=>{ el.disabled=!editable; });
+  // แสดงป้าย "ดูอย่างเดียว" ในหน้า
+  if(!editable && !main.querySelector('.viewbadge-host')){
+    const h2=main.querySelector('h2');
+    if(h2){ const b=document.createElement('span'); b.className='viewbadge viewbadge-host'; b.textContent='👁️ ดูอย่างเดียว'; h2.appendChild(b); }
+  }
+  // ช่องวันที่ในหัว
+  const inp=document.getElementById('asofDate'), chk=document.getElementById('asofAuto');
+  if(inp && !editable) inp.disabled=true;
+  if(chk) chk.disabled=!editable;
+}
+let appStarted=false;
+function startApp(){
+  if(!appStarted){ appStarted=true; initSupabase(); }
+  buildNav(); render(); renderAsOf(); renderUser();
+}
+
+// ================= INIT =================
+buildLoginOptions();
+if(restoreSession()){
+  document.getElementById('loginOverlay').style.display='none';
+  startApp();
+}else{
+  document.getElementById('loginOverlay').style.display='flex';
+}
+</script>
+</body>
+</html>
