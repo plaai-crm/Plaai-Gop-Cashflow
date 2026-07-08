@@ -184,6 +184,11 @@ const USERS = [
 const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม",viewer:"ดูอย่างเดียว"};
 const EDIT_ROLES=["owner","accountant","manager"];
 let currentUser=null, canEdit=false;
+// ===== ความปลอดภัย: ออกจากระบบเมื่อปิดหน้าต่าง + หมดเวลาเมื่อไม่มีการใช้งาน =====
+// เก็บ session ใน sessionStorage → ปิดหน้าต่าง/แท็บ = ออกจากระบบอัตโนมัติ
+const SESSION_KEY='plaai_session';
+const IDLE_TIMEOUT_MS=30*60*1000;   // 30 นาทีที่ไม่มีการเคลื่อนไหว = ออกจากระบบ
+let idleTimer=null, lastActivityWrite=0;
 // =============================================================
 
 let state = loadLocal() || JSON.parse(JSON.stringify(SEED));
@@ -819,8 +824,16 @@ function setSync(st){const dot=document.getElementById('syncdot'),txt=document.g
 function ro(){ if(!canEdit){toast('👁️ โหมดดูอย่างเดียว — บัญชีนี้ไม่มีสิทธิ์แก้ไข'); return true;} return false;}
 function setUser(u){
   currentUser=u; canEdit=EDIT_ROLES.includes(u.role);
-  try{localStorage.setItem('plaai_user',JSON.stringify({name:u.name,role:u.role}));}catch(e){}
+  writeSession();
+  startIdleWatch();
   renderUser();
+}
+// เขียน session ลง sessionStorage (หายเมื่อปิดหน้าต่าง) พร้อมเวลาใช้งานล่าสุด
+function writeSession(){
+  if(!currentUser) return;
+  try{sessionStorage.setItem(SESSION_KEY,JSON.stringify({name:currentUser.name,role:currentUser.role,last:Date.now()}));}catch(e){}
+  // เผื่อ session เดิมที่เคยเก็บใน localStorage — ลบทิ้งเพื่อความปลอดภัย
+  try{localStorage.removeItem('plaai_user');}catch(e){}
 }
 function renderUser(){
   const chip=document.getElementById('userchip'); if(!chip||!currentUser) return;
@@ -846,20 +859,61 @@ function doLogin(){
   document.getElementById('loginOverlay').style.display='none';
   startApp();
 }
-function logout(){
+function logout(reason){
+  stopIdleWatch();
+  try{sessionStorage.removeItem(SESSION_KEY);}catch(e){}
   try{localStorage.removeItem('plaai_user');}catch(e){}
   currentUser=null; canEdit=false;
-  document.getElementById('userchip').style.display='none';
+  const chip=document.getElementById('userchip'); if(chip) chip.style.display='none';
   const pin=document.getElementById('loginPin'); if(pin) pin.value='';
+  const err=document.getElementById('loginErr'); if(err) err.textContent=reason||'';
   document.getElementById('loginOverlay').style.display='flex';
 }
 function restoreSession(){
   try{
-    const s=JSON.parse(localStorage.getItem('plaai_user')||'null');
-    if(s && s.name){ const u=USERS.find(x=>x.name===s.name); if(u){setUser(u);return true;} }
+    const s=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');
+    if(s && s.name){
+      // เผื่อแท็บถูกทิ้งไว้นานเกิน 30 นาที (เบราว์เซอร์อาจหยุดตัวจับเวลาในแท็บพื้นหลัง)
+      if(s.last && (Date.now()-s.last)>IDLE_TIMEOUT_MS){ try{sessionStorage.removeItem(SESSION_KEY);}catch(e){} return false; }
+      const u=USERS.find(x=>x.name===s.name);
+      if(u){setUser(u);return true;}
+    }
   }catch(e){}
   return false;
 }
+// ---------- ตัวจับเวลาไม่มีการใช้งาน (auto-logout 30 นาที) ----------
+function onUserActivity(){
+  if(!currentUser) return;
+  resetIdleTimer();
+  // อัปเดตเวลาใช้งานล่าสุดลง sessionStorage แบบจำกัดความถี่ (ทุก 30 วินาที)
+  const now=Date.now();
+  if(now-lastActivityWrite>30000){ lastActivityWrite=now; writeSession(); }
+}
+function resetIdleTimer(){
+  clearTimeout(idleTimer);
+  idleTimer=setTimeout(()=>{ logout('⏱️ ออกจากระบบอัตโนมัติ (ไม่มีการใช้งานเกิน 30 นาที) — กรุณาเข้าสู่ระบบใหม่'); }, IDLE_TIMEOUT_MS);
+}
+const ACTIVITY_EVENTS=['mousemove','mousedown','keydown','scroll','touchstart','click','wheel'];
+function startIdleWatch(){
+  lastActivityWrite=Date.now();
+  ACTIVITY_EVENTS.forEach(ev=>window.addEventListener(ev,onUserActivity,{passive:true}));
+  resetIdleTimer();
+}
+function stopIdleWatch(){
+  clearTimeout(idleTimer); idleTimer=null;
+  ACTIVITY_EVENTS.forEach(ev=>window.removeEventListener(ev,onUserActivity,{passive:true}));
+}
+// เมื่อกลับมาโฟกัสหน้าต่าง ตรวจว่าเลยเวลา idle หรือยัง (กันแท็บพื้นหลังที่ตัวจับเวลาถูกหยุด)
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && currentUser){
+    try{
+      const s=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');
+      if(s && s.last && (Date.now()-s.last)>IDLE_TIMEOUT_MS){
+        logout('⏱️ ออกจากระบบอัตโนมัติ (ไม่มีการใช้งานเกิน 30 นาที) — กรุณาเข้าสู่ระบบใหม่');
+      }
+    }catch(e){}
+  }
+});
 // ปิดใช้งานช่องกรอก/ปุ่มแก้ไข เมื่อเป็นผู้ชม (นำทาง/สลับปี/สลับแท็บยังทำได้)
 function applyPerms(){
   const main=document.getElementById('main'); if(!main) return;
