@@ -155,7 +155,7 @@ code{background:#f0ede6;padding:1px 6px;border-radius:4px;font-size:12.5px;}
     <input type="password" id="loginPin" inputmode="numeric" autocomplete="off" placeholder="ใส่ PIN" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="go" onclick="doLogin()">เข้าสู่ระบบ</button>
     <div class="err" id="loginErr"></div>
-    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี/ผู้จัดการโรงแรม = แก้ไขได้ · ผู้ชม = ดูอย่างเดียว<br>🔒 ระบบจะออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที</div>
+    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี = แก้ไขได้ · ผู้จัดการโรงแรม = ดูอย่างเดียว เห็นเฉพาะโรงแรมที่รับผิดชอบ<br>🔒 ระบบจะออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที</div>
   </div>
 </div>
 
@@ -174,7 +174,8 @@ const STATE_ID = "main";
 // ---------------------------------------------------------------------------------
 
 // ========== ผู้ใช้ + สิทธิ์ ==========
-// role: 'owner' | 'accountant' | 'manager' = แก้ไขได้  ·  'viewer' = ดูอย่างเดียว
+// role: 'owner' | 'accountant' = แก้ไขได้  ·  'manager' = ดูอย่างเดียว (เห็นเฉพาะโรงแรมที่รับผิดชอบ)  ·  'viewer' = ดูอย่างเดียว
+// 🔑 สิทธิ์การมองเห็นแท็บของผู้จัดการแต่ละคน กำหนดใน TAB_PERMS ด้านล่าง (ไม่ระบุ = เห็นทุกแท็บ)
 // 🔒 ไม่เก็บ PIN ตรงๆ ในไฟล์อีกต่อไป — เก็บเป็นรหัสแฮช (SHA-256) เปิดดูซอร์สโค้ดก็ไม่เห็น PIN
 // วิธีเปลี่ยน PIN: หน้า "⚙️ ตั้งค่า/แชร์" → "🔑 เครื่องมือเปลี่ยน PIN" (สร้างโค้ดมาวางแทนค่า hash ด้านล่าง)
 // PIN ชุดเริ่มต้นยังเป็นชุดเดิมที่ทีมใช้อยู่ (ผู้ใช้ไม่ต้องเปลี่ยนวิธีใช้งาน) — แนะนำทยอยเปลี่ยนเป็น 6 หลักขึ้นไป
@@ -185,8 +186,18 @@ const USERS = [
   {id:"mgr1",   name:"ผู้จัดการโรงแรม 1 (Manager)",  role:"manager",    hash:"7af53262507c7496e802942e2bcf6cf27f8d0f7aad43b84c8d3c10460220253e"},
   {id:"mgr2",   name:"ผู้จัดการโรงแรม 2 (Manager)",  role:"manager",    hash:"4ac6c50061999beae68d8e1f946620bef619eb906c89d71ca300a20daba37bc3"},
   {id:"mgr3",   name:"ผู้จัดการโรงแรม 3 (Manager)",  role:"manager",    hash:"10bba9eea02dc4bf875b76d7b3bb235b9802d2d9dad6fd3297ce4e1831a24101"},
-  {id:"viewer", name:"ผู้ชม (Viewer)",               role:"viewer",     hash:"23b81a81261dd8a9f2d2a2d5fdb258dfbecff938be696b4177a5c8da8ab1fbdc"}
+  {id:"viewer", name:"ผู้จัดการโรงแรม 4 (Manager)",  role:"manager",    hash:"23b81a81261dd8a9f2d2a2d5fdb258dfbecff938be696b4177a5c8da8ab1fbdc"}
 ];
+// 🔑 สิทธิ์การมองเห็นแท็บ (key = id ผู้ใช้) · ไม่มีในรายการ = เห็นทุกแท็บ (เจ้าของกิจการ/บัญชี)
+// แท็บ: construction=เงินก่อสร้าง · combined=ภาพรวม · prime/play/saroj/bowin/bowin2 · setup=ตั้งค่า
+const TAB_PERMS = {
+  mgr1:   ["combined","prime"],                        // ผู้จัดการ 1 → Prime + ภาพรวม
+  mgr2:   ["combined","saroj"],                        // ผู้จัดการ 2 → Saroj + ภาพรวม
+  mgr3:   ["combined","play"],                         // ผู้จัดการ 3 → Play + ภาพรวม
+  viewer: ["combined","bowin","bowin2","construction"] // ผู้จัดการ 4 → Bowin, Bowin 2, ภาพรวม, เงินก่อสร้าง
+};
+function allowedTabs(){ return currentUser ? (TAB_PERMS[currentUser.id]||null) : null; }
+function canSeeTab(t){ const a=allowedTabs(); return !a || a.includes(t); }
 // SHA-256 (pure JS) — ใช้ตรวจ PIN ในเครื่อง เฉพาะกรณีเซิร์ฟเวอร์ยังไม่พร้อม (ปกติจะตรวจที่ Supabase)
 function sha256hex(ascii){
   function rr(v,a){return (v>>>a)|(v<<(32-a));}
@@ -233,8 +244,8 @@ function sha256hex(ascii){
   return result;
 }
 function localPinHash(id,pin){ return sha256hex(PIN_SALT+'|'+id+'|'+pin); }
-const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม",viewer:"ดูอย่างเดียว"};
-const EDIT_ROLES=["owner","accountant","manager"];
+const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม (ดูอย่างเดียว)",viewer:"ดูอย่างเดียว"};
+const EDIT_ROLES=["owner","accountant"];   // เฉพาะเจ้าของกิจการ + บัญชี แก้ไขได้ · ผู้จัดการโรงแรม = ดูอย่างเดียว
 let currentUser=null, canEdit=false, sessionPin=null, loginFails=0, loginLockUntil=0;
 // ===== ความปลอดภัย: ออกจากระบบเมื่อปิดหน้าต่าง + หมดเวลาเมื่อไม่มีการใช้งาน =====
 // เก็บ session ใน sessionStorage → ปิดหน้าต่าง/แท็บ = ออกจากระบบอัตโนมัติ
@@ -473,9 +484,10 @@ function setPath(obj,path,val){
 function buildNav(){
   const tabs=[['construction','🏗️ เงินก่อสร้าง'],['combined','📊 ภาพรวม'],
     ['prime','Prime'],['play','Play'],['saroj','Saroj'],['bowin','Bowin'],['bowin2','Bowin 2'],['setup','⚙️ ตั้งค่า/แชร์']];
-  document.getElementById('nav').innerHTML=tabs.map(t=>`<button data-tab="${t[0]}" class="${t[0]===currentTab?'active':''}" onclick="showTab('${t[0]}')">${t[1]}</button>`).join('');
+  const visible=tabs.filter(t=>canSeeTab(t[0]));
+  document.getElementById('nav').innerHTML=visible.map(t=>`<button data-tab="${t[0]}" class="${t[0]===currentTab?'active':''}" onclick="showTab('${t[0]}')">${t[1]}</button>`).join('');
 }
-function showTab(t){currentTab=t;buildNav();render();window.scrollTo(0,0);}
+function showTab(t){ if(!canSeeTab(t))return; currentTab=t;buildNav();render();window.scrollTo(0,0);}
 
 function render(){
   const m=document.getElementById('main');
@@ -731,8 +743,10 @@ insert into plaai_users (id,name,role,pin_hash) values
  ('mgr1','ผู้จัดการโรงแรม 1 (Manager)','manager',crypt('3333',gen_salt('bf'))),
  ('mgr2','ผู้จัดการโรงแรม 2 (Manager)','manager',crypt('4444',gen_salt('bf'))),
  ('mgr3','ผู้จัดการโรงแรม 3 (Manager)','manager',crypt('5555',gen_salt('bf'))),
- ('viewer','ผู้ชม (Viewer)','viewer',crypt('6666',gen_salt('bf')))
+ ('viewer','ผู้จัดการโรงแรม 4 (Manager)','manager',crypt('6666',gen_salt('bf')))
 on conflict (id) do nothing;
+-- ถ้าเคยสร้างผู้ใช้ 'viewer' เป็น role 'viewer' ไว้แล้ว ให้ปรับเป็นผู้จัดการ 4 (ดูอย่างเดียวเช่นกัน):
+update plaai_users set name='ผู้จัดการโรงแรม 4 (Manager)', role='manager' where id='viewer';
 
 -- 3) ฟังก์ชันตรวจ PIN ตอนเข้าสู่ระบบ
 create or replace function plaai_verify_login(p_user_id text, p_pin text)
@@ -749,7 +763,7 @@ begin
   if not exists (
     select 1 from plaai_users
     where id=p_user_id and pin_hash=crypt(p_pin,pin_hash)
-      and role in ('owner','accountant','manager')
+      and role in ('owner','accountant')
   ) then
     raise exception 'unauthorized';
   end if;
@@ -786,7 +800,7 @@ function viewSetup(){
       เปลี่ยนชื่อไฟล์เป็น <code>index.html</code> → push ขึ้น repo (แนะนำตั้ง repo เป็น <b>Private</b>) → Settings → <b>Pages</b> → Source: <b>Deploy from branch</b> → เลือก <code>main</code> / <code>root</code> → Save · ได้ลิงก์ <code>https://ชื่อคุณ.github.io/ชื่อ-repo/</code> ส่งให้ทีม<br>
       <br>ทุกคนที่เปิดลิงก์เดียวกันจะเห็นและแก้ข้อมูลชุดเดียวกันแบบเรียลไทม์ · ก่อนตั้งค่าเสร็จ ข้อมูลจะเก็บเฉพาะในเครื่องนี้
     </div>
-    <div class="callout" style="margin-top:14px">🔐 <b>ระบบล็อกอิน + สิทธิ์ผู้ใช้ (6 คน):</b> เปิดลิงก์แล้วต้องเลือกชื่อ + ใส่ PIN ก่อน · <b>เจ้าของกิจการ, ฝ่ายบัญชี, ผู้จัดการโรงแรม</b> = แก้ไขได้ทุกตึก · <b>ผู้ชม</b> = ดูได้ทุกหน้าแต่แก้ไม่ได้ · ทุกคนที่แก้จะซิงก์ให้เห็นตรงกันแบบเรียลไทม์<br><br>
+    <div class="callout" style="margin-top:14px">🔐 <b>ระบบล็อกอิน + สิทธิ์ผู้ใช้ (6 คน):</b> เปิดลิงก์แล้วต้องเลือกชื่อ + ใส่ PIN ก่อน · <b>เจ้าของกิจการ, ฝ่ายบัญชี</b> = แก้ไขได้ทุกตึก · <b>ผู้จัดการโรงแรม 1–4</b> = ดูอย่างเดียว และเห็นเฉพาะโรงแรมที่รับผิดชอบ (มจก.1→Prime · มจก.2→Saroj · มจก.3→Play · มจก.4→Bowin, Bowin 2, เงินก่อสร้าง — ทุกคนเห็นหน้าภาพรวม) · ทุกคนที่แก้จะซิงก์ให้เห็นตรงกันแบบเรียลไทม์<br><br>
     🛡️ <b>ความปลอดภัยที่เปิดใช้อยู่:</b> ① ไม่มี PIN โชว์ในซอร์สโค้ด (เก็บเป็นรหัสแฮช) · ② เมื่อรัน SQL ขั้นที่ 1 แล้ว ระบบจะตรวจ PIN + สิทธิ์ที่เซิร์ฟเวอร์ก่อน<b>บันทึกทุกครั้ง</b> — คนที่ไม่มี PIN แก้ข้อมูลไม่ได้แม้จะรู้ anon key · ③ ใส่ PIN ผิด 5 ครั้ง ระบบพัก 30 วินาที · ④ ออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที · แนะนำใช้ PIN 6 หลักขึ้นไป · ถ้าต้องการระดับสูงสุด (อีเมล+รหัสผ่าน ผ่าน Supabase Auth) แจ้งได้ค่ะ</div>
     <details><summary>🔑 เครื่องมือเปลี่ยน PIN (สร้างโค้ดสำหรับ PIN ใหม่ — ตัว PIN ไม่ถูกบันทึกที่ใด)</summary>
       <p class="hint">เลือกชื่อ → ใส่ PIN ใหม่ → กด "สร้างโค้ด" → ทำตาม 2 ขั้นที่ระบบแสดง (รัน SQL ใน Supabase + วางค่า hash ในไฟล์ แล้วอัปโหลดขึ้น GitHub ใหม่)</p>
@@ -1116,6 +1130,7 @@ function applyPerms(){
 let appStarted=false;
 function startApp(){
   if(!appStarted){ appStarted=true; connectData(); }
+  if(!canSeeTab(currentTab)){ const a=allowedTabs(); currentTab=(a&&a[0])||'combined'; }
   buildNav(); render(); renderAsOf(); renderUser();
 }
 
