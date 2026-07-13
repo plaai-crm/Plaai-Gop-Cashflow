@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 🔒 Content-Security-Policy: อนุญาตเฉพาะสคริปต์/การเชื่อมต่อที่จำเป็น — ถ้าเปลี่ยน SUPABASE_URL ต้องแก้ connect-src ด้านล่างให้ตรงด้วย -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://qlnndvycciihakzuxzjf.supabase.co wss://qlnndvycciihakzuxzjf.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
 <title>PLAAI Hotel Group — กระแสเงินสด &amp; ประมาณการ</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -152,7 +155,7 @@ code{background:#f0ede6;padding:1px 6px;border-radius:4px;font-size:12.5px;}
     <input type="password" id="loginPin" inputmode="numeric" autocomplete="off" placeholder="ใส่ PIN" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="go" onclick="doLogin()">เข้าสู่ระบบ</button>
     <div class="err" id="loginErr"></div>
-    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี/ผู้จัดการโรงแรม = แก้ไขได้ · ผู้ชม = ดูอย่างเดียว</div>
+    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี/ผู้จัดการโรงแรม = แก้ไขได้ · ผู้ชม = ดูอย่างเดียว<br>🔒 ระบบจะออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที</div>
   </div>
 </div>
 
@@ -170,20 +173,69 @@ const SUPABASE_TABLE = "plaai_state";
 const STATE_ID = "main";
 // ---------------------------------------------------------------------------------
 
-// ========== ผู้ใช้ + สิทธิ์ (แก้ชื่อ/PIN ได้ตรงนี้) ==========
+// ========== ผู้ใช้ + สิทธิ์ ==========
 // role: 'owner' | 'accountant' | 'manager' = แก้ไขได้  ·  'viewer' = ดูอย่างเดียว
-// เปลี่ยน PIN ให้ทีมแต่ละคนตามต้องการ (ห้ามซ้ำกัน แนะนำ 4-6 หลัก)
+// 🔒 ไม่เก็บ PIN ตรงๆ ในไฟล์อีกต่อไป — เก็บเป็นรหัสแฮช (SHA-256) เปิดดูซอร์สโค้ดก็ไม่เห็น PIN
+// วิธีเปลี่ยน PIN: หน้า "⚙️ ตั้งค่า/แชร์" → "🔑 เครื่องมือเปลี่ยน PIN" (สร้างโค้ดมาวางแทนค่า hash ด้านล่าง)
+// PIN ชุดเริ่มต้นยังเป็นชุดเดิมที่ทีมใช้อยู่ (ผู้ใช้ไม่ต้องเปลี่ยนวิธีใช้งาน) — แนะนำทยอยเปลี่ยนเป็น 6 หลักขึ้นไป
+const PIN_SALT='PLAAI-CF-2026';
 const USERS = [
-  {name:"เจ้าของกิจการ (Owner)",       pin:"1111", role:"owner"},
-  {name:"ฝ่ายบัญชี (Accounting)",       pin:"2222", role:"accountant"},
-  {name:"ผู้จัดการโรงแรม 1 (Manager)",  pin:"3333", role:"manager"},
-  {name:"ผู้จัดการโรงแรม 2 (Manager)",  pin:"4444", role:"manager"},
-  {name:"ผู้จัดการโรงแรม 3 (Manager)",  pin:"5555", role:"manager"},
-  {name:"ผู้ชม (Viewer)",               pin:"6666", role:"viewer"}
+  {id:"owner",  name:"เจ้าของกิจการ (Owner)",       role:"owner",      hash:"9fd119619fac7565b1bae44a4036cbe1907c7ded67f69010d96547d7d6f46577"},
+  {id:"acct",   name:"ฝ่ายบัญชี (Accounting)",       role:"accountant", hash:"d5a8b09ad3cd8c51e263c0cf63cf31ac4320b6d7b5590ef9c100966e4c6af500"},
+  {id:"mgr1",   name:"ผู้จัดการโรงแรม 1 (Manager)",  role:"manager",    hash:"7af53262507c7496e802942e2bcf6cf27f8d0f7aad43b84c8d3c10460220253e"},
+  {id:"mgr2",   name:"ผู้จัดการโรงแรม 2 (Manager)",  role:"manager",    hash:"4ac6c50061999beae68d8e1f946620bef619eb906c89d71ca300a20daba37bc3"},
+  {id:"mgr3",   name:"ผู้จัดการโรงแรม 3 (Manager)",  role:"manager",    hash:"10bba9eea02dc4bf875b76d7b3bb235b9802d2d9dad6fd3297ce4e1831a24101"},
+  {id:"viewer", name:"ผู้ชม (Viewer)",               role:"viewer",     hash:"23b81a81261dd8a9f2d2a2d5fdb258dfbecff938be696b4177a5c8da8ab1fbdc"}
 ];
+// SHA-256 (pure JS) — ใช้ตรวจ PIN ในเครื่อง เฉพาะกรณีเซิร์ฟเวอร์ยังไม่พร้อม (ปกติจะตรวจที่ Supabase)
+function sha256hex(ascii){
+  function rr(v,a){return (v>>>a)|(v<<(32-a));}
+  ascii=unescape(encodeURIComponent(ascii));
+  var mathPow=Math.pow, maxWord=mathPow(2,32), result='', words=[], asciiBitLength=ascii.length*8;
+  var hash=sha256hex.h=sha256hex.h||[], k=sha256hex.k=sha256hex.k||[], primeCounter=k.length;
+  var isComposite={};
+  for(var candidate=2; primeCounter<64; candidate++){
+    if(!isComposite[candidate]){
+      for(var i=0;i<313;i+=candidate) isComposite[i]=candidate;
+      hash[primeCounter]=(mathPow(candidate,.5)*maxWord)|0;
+      k[primeCounter++]=(mathPow(candidate,1/3)*maxWord)|0;
+    }
+  }
+  ascii+='\x80';
+  while(ascii.length%64-56) ascii+='\x00';
+  for(i=0;i<ascii.length;i++){
+    var j=ascii.charCodeAt(i);
+    if(j>>8) return;
+    words[i>>2]|=j<<((3-i)%4)*8;
+  }
+  words[words.length]=(asciiBitLength/maxWord)|0;
+  words[words.length]=asciiBitLength;
+  for(j=0;j<words.length;){
+    var w=words.slice(j,j+=16), oldHash=hash;
+    hash=hash.slice(0,8);
+    for(i=0;i<64;i++){
+      var w15=w[i-15],w2=w[i-2];
+      var a=hash[0],e=hash[4];
+      var temp1=hash[7]+(rr(e,6)^rr(e,11)^rr(e,25))+((e&hash[5])^(~e&hash[6]))+k[i]
+        +(w[i]=(i<16)?w[i]:(w[i-16]+(rr(w15,7)^rr(w15,18)^(w15>>>3))+w[i-7]+(rr(w2,17)^rr(w2,19)^(w2>>>10)))|0);
+      var temp2=(rr(a,2)^rr(a,13)^rr(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+      hash=[(temp1+temp2)|0].concat(hash);
+      hash[4]=(hash[4]+temp1)|0;
+    }
+    for(i=0;i<8;i++) hash[i]=(hash[i]+oldHash[i])|0;
+  }
+  for(i=0;i<8;i++){
+    for(j=3;j+1;j--){
+      var b=(hash[i]>>(j*8))&255;
+      result+=((b>>4).toString(16))+((b&15).toString(16));
+    }
+  }
+  return result;
+}
+function localPinHash(id,pin){ return sha256hex(PIN_SALT+'|'+id+'|'+pin); }
 const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม",viewer:"ดูอย่างเดียว"};
 const EDIT_ROLES=["owner","accountant","manager"];
-let currentUser=null, canEdit=false;
+let currentUser=null, canEdit=false, sessionPin=null, loginFails=0, loginLockUntil=0;
 // ===== ความปลอดภัย: ออกจากระบบเมื่อปิดหน้าต่าง + หมดเวลาเมื่อไม่มีการใช้งาน =====
 // เก็บ session ใน sessionStorage → ปิดหน้าต่าง/แท็บ = ออกจากระบบอัตโนมัติ
 const SESSION_KEY='plaai_session';
@@ -646,34 +698,105 @@ function viewCombined(){
 function hasData(h,yr){return MONTHS.some(m=>resolveGOP(h,yr,m).v!==null);}
 
 // ---- setup ----
-function viewSetup(){
-  const cfgOk=SUPABASE_URL && SUPABASE_ANON_KEY;
-  return `<div class="card">
-    <h2>⚙️ ตั้งค่าการแชร์แบบเรียลไทม์ (Supabase + GitHub)</h2>
-    <p class="hint">สถานะปัจจุบัน: <b>${cfgOk?'เชื่อม Supabase แล้ว':'ยังไม่ได้ตั้งค่า Supabase — ทำงานแบบออฟไลน์ (เก็บในเครื่องนี้เท่านั้น)'}</b></p>
-    <div class="callout">🗓️ <b>วันที่อัปเดตข้อมูล:</b> ปรับได้ที่มุมขวาบน — เปิด "อัตโนมัติ" เมื่อขึ้นออนไลน์ (ระบบจะใช้วันที่ปัจจุบันให้เอง) หรือปิดเพื่อกำหนดวันที่เอง · เมื่อวันที่อัปเดตถึงเดือนใด ตัวเลข GOP ประมาณการ (กล่องสีส้ม) ของเดือนนั้นจะเปลี่ยนเป็นสีปกติอัตโนมัติ</div>
-    <div class="setupbox">
-      <b>ขั้นที่ 1 — สร้างตารางใน Supabase:</b><br>
-      เข้า Supabase → โปรเจกต์ของคุณ → เมนู <b>SQL Editor</b> → วางโค้ดนี้แล้วกด Run:<br>
-      <div style="background:#0f1b2e;color:#dbe7f5;border-radius:8px;padding:12px;margin:8px 0;font-size:12px;line-height:1.6;overflow-x:auto"><code style="background:none;color:inherit;white-space:pre">create table if not exists plaai_state (
+const SETUP_SQL=`-- ===== PLAAI: ตารางข้อมูล + ระบบความปลอดภัย (รันซ้ำได้ ข้อมูลไม่หาย) =====
+create extension if not exists pgcrypto;
+
+-- 1) ตารางเก็บข้อมูลกระแสเงินสด (อ่านได้อย่างเดียวจากภายนอก — เขียนต้องผ่านฟังก์ชันตรวจ PIN)
+create table if not exists plaai_state (
   id text primary key,
   payload text,
   updated_at bigint
 );
 alter table plaai_state enable row level security;
-create policy "team access" on plaai_state
-  for all using (true) with check (true);
-alter publication supabase_realtime add table plaai_state;</code></div>
+drop policy if exists "team access" on plaai_state;
+drop policy if exists "read only" on plaai_state;
+create policy "read only" on plaai_state for select using (true);
+
+do $$ begin
+  alter publication supabase_realtime add table plaai_state;
+exception when duplicate_object then null; end $$;
+
+-- 2) ตารางผู้ใช้ (PIN เข้ารหัสแบบ bcrypt — อ่าน PIN คืนไม่ได้ และภายนอกเข้าถึงตารางนี้ไม่ได้เลย)
+create table if not exists plaai_users (
+  id text primary key,
+  name text not null,
+  role text not null,
+  pin_hash text not null
+);
+alter table plaai_users enable row level security;
+
+insert into plaai_users (id,name,role,pin_hash) values
+ ('owner','เจ้าของกิจการ (Owner)','owner',crypt('1111',gen_salt('bf'))),
+ ('acct','ฝ่ายบัญชี (Accounting)','accountant',crypt('2222',gen_salt('bf'))),
+ ('mgr1','ผู้จัดการโรงแรม 1 (Manager)','manager',crypt('3333',gen_salt('bf'))),
+ ('mgr2','ผู้จัดการโรงแรม 2 (Manager)','manager',crypt('4444',gen_salt('bf'))),
+ ('mgr3','ผู้จัดการโรงแรม 3 (Manager)','manager',crypt('5555',gen_salt('bf'))),
+ ('viewer','ผู้ชม (Viewer)','viewer',crypt('6666',gen_salt('bf')))
+on conflict (id) do nothing;
+
+-- 3) ฟังก์ชันตรวจ PIN ตอนเข้าสู่ระบบ
+create or replace function plaai_verify_login(p_user_id text, p_pin text)
+returns table(role text, name text)
+language sql security definer set search_path=public as $$
+  select u.role, u.name from plaai_users u
+  where u.id=p_user_id and u.pin_hash=crypt(p_pin,u.pin_hash);
+$$;
+
+-- 4) ฟังก์ชันบันทึกข้อมูล — ตรวจ PIN + สิทธิ์แก้ไข ก่อนบันทึกทุกครั้ง
+create or replace function plaai_save_state(p_user_id text, p_pin text, p_payload text, p_updated bigint)
+returns void language plpgsql security definer set search_path=public as $$
+begin
+  if not exists (
+    select 1 from plaai_users
+    where id=p_user_id and pin_hash=crypt(p_pin,pin_hash)
+      and role in ('owner','accountant','manager')
+  ) then
+    raise exception 'unauthorized';
+  end if;
+  insert into plaai_state(id,payload,updated_at)
+  values ('main',p_payload,coalesce(p_updated,(extract(epoch from now())*1000)::bigint))
+  on conflict (id) do update set payload=excluded.payload, updated_at=excluded.updated_at;
+end $$;
+
+-- 5) สิทธิ์การเรียกใช้ฟังก์ชัน + ปิดการเข้าถึงตารางผู้ใช้โดยตรง
+revoke all on table plaai_users from anon, authenticated;
+grant execute on function plaai_verify_login(text,text) to anon, authenticated;
+grant execute on function plaai_save_state(text,text,text,bigint) to anon, authenticated;
+
+-- เปลี่ยน PIN ภายหลัง (ตัวอย่าง — หรือใช้ "เครื่องมือเปลี่ยน PIN" ในหน้า ตั้งค่า/แชร์):
+-- update plaai_users set pin_hash=crypt('PINใหม่',gen_salt('bf')) where id='owner';`;
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function viewSetup(){
+  const cfgOk=SUPABASE_URL && SUPABASE_ANON_KEY;
+  const secMode=cfgOk?(secureWrite?'🔐 โหมดปลอดภัย':'⚠️ ยังไม่ได้รัน SQL อัปเกรดความปลอดภัย (ขั้นที่ 1)'):'';
+  const pinToolOptions=USERS.map(u=>`<option value="${u.id}">${u.name}</option>`).join('');
+  return `<div class="card">
+    <h2>⚙️ ตั้งค่าการแชร์แบบเรียลไทม์ (Supabase + GitHub)</h2>
+    <p class="hint">สถานะปัจจุบัน: <b>${cfgOk?'เชื่อม Supabase แล้ว'+(secMode?' · '+secMode:''):'ยังไม่ได้ตั้งค่า Supabase — ทำงานแบบออฟไลน์ (เก็บในเครื่องนี้เท่านั้น)'}</b></p>
+    <div class="callout">🗓️ <b>วันที่อัปเดตข้อมูล:</b> ปรับได้ที่มุมขวาบน — เปิด "อัตโนมัติ" เมื่อขึ้นออนไลน์ (ระบบจะใช้วันที่ปัจจุบันให้เอง) หรือปิดเพื่อกำหนดวันที่เอง · เมื่อวันที่อัปเดตถึงเดือนใด ตัวเลข GOP ประมาณการ (กล่องสีส้ม) ของเดือนนั้นจะเปลี่ยนเป็นสีปกติอัตโนมัติ</div>
+    <div class="setupbox">
+      <b>ขั้นที่ 1 — สร้างตาราง + ระบบความปลอดภัยใน Supabase:</b><br>
+      เข้า Supabase → โปรเจกต์ของคุณ → เมนู <b>SQL Editor</b> → วางโค้ดนี้ทั้งก้อนแล้วกด Run · <b>ถ้าเคยตั้งค่าเวอร์ชันเก่าไว้แล้ว ให้รันก้อนนี้ทับอีกครั้งเพื่ออัปเกรดความปลอดภัย</b> (รันซ้ำได้ ข้อมูลเดิมไม่หาย):<br>
+      <div style="background:#0f1b2e;color:#dbe7f5;border-radius:8px;padding:12px;margin:8px 0;font-size:12px;line-height:1.6;overflow-x:auto;max-height:300px;overflow-y:auto"><code style="background:none;color:inherit;white-space:pre">${escHtml(SETUP_SQL)}</code></div>
       <b>ขั้นที่ 2 — คัดลอกค่า API:</b><br>
       Project Settings (⚙️) → <b>API Keys</b> → คัดลอก <code>Project URL</code> และ <code>Publishable key</code> (ขึ้นต้น <code>sb_publishable_</code>) · ถ้าเป็นโปรเจกต์เก่าที่ยังมี <code>anon public</code> key ก็ใช้ได้เช่นกัน<br>
       <b>ขั้นที่ 3 — ใส่ค่าในไฟล์:</b><br>
-      เปิด <code>index.html</code> ด้วย Notepad → หาบรรทัด <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> ใกล้ต้นไฟล์ → วางค่า → เซฟ<br>
+      เปิด <code>index.html</code> ด้วย Notepad → หาบรรทัด <code>SUPABASE_URL</code> / <code>SUPABASE_ANON_KEY</code> ใกล้ต้นไฟล์ → วางค่า → เซฟ · <b>ถ้าเปลี่ยน URL ของ Supabase</b> อย่าลืมแก้บรรทัด <code>Content-Security-Policy</code> ใกล้บนสุดของไฟล์ให้เป็น URL ใหม่ด้วย<br>
       <b>ขั้นที่ 4 — ขึ้น GitHub Pages:</b><br>
-      เปลี่ยนชื่อไฟล์เป็น <code>index.html</code> → push ขึ้น repo → Settings → <b>Pages</b> → Source: <b>Deploy from branch</b> → เลือก <code>main</code> / <code>root</code> → Save · ได้ลิงก์ <code>https://ชื่อคุณ.github.io/ชื่อ-repo/</code> ส่งให้ทีม 5 คน<br>
+      เปลี่ยนชื่อไฟล์เป็น <code>index.html</code> → push ขึ้น repo (แนะนำตั้ง repo เป็น <b>Private</b>) → Settings → <b>Pages</b> → Source: <b>Deploy from branch</b> → เลือก <code>main</code> / <code>root</code> → Save · ได้ลิงก์ <code>https://ชื่อคุณ.github.io/ชื่อ-repo/</code> ส่งให้ทีม<br>
       <br>ทุกคนที่เปิดลิงก์เดียวกันจะเห็นและแก้ข้อมูลชุดเดียวกันแบบเรียลไทม์ · ก่อนตั้งค่าเสร็จ ข้อมูลจะเก็บเฉพาะในเครื่องนี้
-      <br><br><b>หมายเหตุความปลอดภัย:</b> policy ด้านบนเปิดให้ใครมี anon key ก็แก้ได้ เหมาะกับทีมภายใน · anon key เปิดเผยได้ตามปกติของ Supabase (ความปลอดภัยจริงอยู่ที่ RLS)
     </div>
-    <div class="callout" style="margin-top:14px">🔐 <b>ระบบล็อกอิน + สิทธิ์ผู้ใช้ (6 คน):</b> เปิดลิงก์แล้วต้องเลือกชื่อ + ใส่ PIN ก่อน · <b>เจ้าของกิจการ, ฝ่ายบัญชี, ผู้จัดการโรงแรม (5 คน)</b> = แก้ไขข้อมูลได้ทุกตึก · <b>ผู้ชม (1 คน)</b> = ดูได้ทุกหน้าแต่แก้ไม่ได้ (ช่องกรอกจะถูกล็อก) · ทุกคนที่แก้จะซิงก์ให้เห็นตรงกันแบบเรียลไทม์ · <b>แก้ชื่อ/PIN ของแต่ละคน</b> ได้ในไฟล์ <code>index.html</code> ที่ตัวแปร <code>USERS</code> (ใกล้ต้นไฟล์) · ข้อควรทราบ: PIN นี้เป็นการกันแบบเบื้องต้นสำหรับทีมภายใน หากเปิดซอร์สโค้ดจะเห็น PIN ได้ — ถ้าต้องการล็อกอินที่ปลอดภัยจริงจัง (อีเมล+รหัสผ่าน ผ่าน Supabase Auth) แจ้งได้ค่ะ</div>
+    <div class="callout" style="margin-top:14px">🔐 <b>ระบบล็อกอิน + สิทธิ์ผู้ใช้ (6 คน):</b> เปิดลิงก์แล้วต้องเลือกชื่อ + ใส่ PIN ก่อน · <b>เจ้าของกิจการ, ฝ่ายบัญชี, ผู้จัดการโรงแรม</b> = แก้ไขได้ทุกตึก · <b>ผู้ชม</b> = ดูได้ทุกหน้าแต่แก้ไม่ได้ · ทุกคนที่แก้จะซิงก์ให้เห็นตรงกันแบบเรียลไทม์<br><br>
+    🛡️ <b>ความปลอดภัยที่เปิดใช้อยู่:</b> ① ไม่มี PIN โชว์ในซอร์สโค้ด (เก็บเป็นรหัสแฮช) · ② เมื่อรัน SQL ขั้นที่ 1 แล้ว ระบบจะตรวจ PIN + สิทธิ์ที่เซิร์ฟเวอร์ก่อน<b>บันทึกทุกครั้ง</b> — คนที่ไม่มี PIN แก้ข้อมูลไม่ได้แม้จะรู้ anon key · ③ ใส่ PIN ผิด 5 ครั้ง ระบบพัก 30 วินาที · ④ ออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที · แนะนำใช้ PIN 6 หลักขึ้นไป · ถ้าต้องการระดับสูงสุด (อีเมล+รหัสผ่าน ผ่าน Supabase Auth) แจ้งได้ค่ะ</div>
+    <details><summary>🔑 เครื่องมือเปลี่ยน PIN (สร้างโค้ดสำหรับ PIN ใหม่ — ตัว PIN ไม่ถูกบันทึกที่ใด)</summary>
+      <p class="hint">เลือกชื่อ → ใส่ PIN ใหม่ → กด "สร้างโค้ด" → ทำตาม 2 ขั้นที่ระบบแสดง (รัน SQL ใน Supabase + วางค่า hash ในไฟล์ แล้วอัปโหลดขึ้น GitHub ใหม่)</p>
+      <div class="fxrow">
+        <select id="pinToolUser">${pinToolOptions}</select>
+        <input type="text" id="pinToolPin" autocomplete="off" placeholder="PIN ใหม่ (แนะนำ 6 หลักขึ้นไป)">
+        <button class="mini primary" onclick="genPinCode()">สร้างโค้ด</button>
+      </div>
+      <div id="pinToolOut" style="font-size:12.5px;line-height:1.9;word-break:break-all"></div>
+    </details>
     <div style="margin-top:16px">
       <button class="mini" onclick="exportJSON()">⬇️ Export ข้อมูล (JSON)</button>
       <button class="mini" onclick="document.getElementById('imp').click()">⬆️ Import ข้อมูล</button>
@@ -734,6 +857,20 @@ function delItem(path,i){if(ro())return;let o=state;path.forEach(p=>o=o[p]);o.sp
 function exportJSON(){const b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='plaai_hotel_data.json';a.click();}
 function importJSON(inp){if(ro())return;const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{state=JSON.parse(e.target.result);migrate();save();render();toast('นำเข้าข้อมูลแล้ว');}catch(err){toast('ไฟล์ไม่ถูกต้อง');}};r.readAsText(f);}
 function resetAll(){if(ro())return;if(confirm('รีเซ็ตกลับค่าตั้งต้นทั้งหมด?')){state=JSON.parse(JSON.stringify(SEED));migrate();save();render();}}
+// 🔑 สร้างโค้ดเปลี่ยน PIN (คำนวณในเครื่องเท่านั้น — PIN ไม่ถูกส่ง/บันทึกที่ใด)
+function genPinCode(){
+  const id=document.getElementById('pinToolUser').value;
+  const pinIn=document.getElementById('pinToolPin');
+  const out=document.getElementById('pinToolOut');
+  const pin=(pinIn.value||'').trim();
+  if(!pin || pin.length<4){out.innerHTML='<span style="color:var(--neg)">กรุณาใส่ PIN อย่างน้อย 4 หลัก (แนะนำ 6 หลักขึ้นไป)</span>';return;}
+  const h=localPinHash(id,pin);
+  const sql="update plaai_users set pin_hash=crypt('"+pin.replace(/'/g,"''")+"',gen_salt('bf')) where id='"+id+"';";
+  out.innerHTML='<b>1) รันใน Supabase → SQL Editor:</b><br><code>'+escHtml(sql)+'</code><br>'
+    +'<b>2) แก้ในไฟล์ index.html</b> — หาตัวแปร <code>USERS</code> บรรทัดของ <code>id:"'+id+'"</code> แล้ววางค่า hash ใหม่แทนค่าเดิม:<br><code>hash:"'+h+'"</code><br>'
+    +'<span class="hint">ทำครบทั้ง 2 ขั้น แล้วอัปโหลดไฟล์ขึ้น GitHub ใหม่</span>';
+  pinIn.value='';
+}
 
 // ================= CHARTS =================
 function drawCharts(){
@@ -772,12 +909,14 @@ function pieOpt(t){return{plugins:{legend:{position:'bottom',labels:{font:{size:
 function barOpt(){return{plugins:{legend:{display:true,position:'top'}},scales:{y:{ticks:{callback:v=>fmt(v)}}}};}
 
 // ================= SUPABASE SYNC =================
+let sbLibReadyResolve; const sbLibReady=new Promise(r=>sbLibReadyResolve=r);
+let dataConnected=false;
 function initSupabase(){
-  if(!SUPABASE_URL || !SUPABASE_ANON_KEY){setSync('off');return;}
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY){setSync('off');sbLibReadyResolve();return;}
   const s=document.createElement('script');
   s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-  s.onload=connectSupabase;
-  s.onerror=()=>setSync('err');
+  s.onload=()=>{try{sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);}catch(e){console.error(e);setSync('err');}sbLibReadyResolve();};
+  s.onerror=()=>{setSync('err');sbLibReadyResolve();};
   document.head.appendChild(s);
 }
 function applyRemote(payload,updated){
@@ -791,9 +930,11 @@ function applyRemote(payload,updated){
     }
   }catch(e){console.error(e);}
 }
-function connectSupabase(){
+async function connectData(){
+  await sbLibReady;
+  if(!sb || dataConnected) return;
+  dataConnected=true;
   try{
-    sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
     setSync('connecting');
     // 1) ดึงข้อมูลล่าสุดตอนเปิด
     sb.from(SUPABASE_TABLE).select('payload,updated_at').eq('id',STATE_ID).maybeSingle()
@@ -810,10 +951,25 @@ function connectSupabase(){
       .subscribe(st=>{ if(st==='SUBSCRIBED') setSync('on'); });
   }catch(e){console.error(e);setSync('err');}
 }
+let secureWrite=true; // บันทึกผ่านฟังก์ชันฝั่งเซิร์ฟเวอร์ (ตรวจ PIN+สิทธิ์ก่อนทุกครั้ง) ถ้าติดตั้งแล้ว
 function pushRemote(){
-  if(!sb || !canEdit)return;
-  sb.from(SUPABASE_TABLE).upsert({id:STATE_ID,payload:JSON.stringify(state),updated_at:state.updatedAt||Date.now()})
-    .then(({error})=>{ if(error) console.error(error); });
+  if(!sb || !canEdit || !currentUser)return;
+  const payload=JSON.stringify(state), up=state.updatedAt||Date.now();
+  if(secureWrite && sessionPin){
+    sb.rpc('plaai_save_state',{p_user_id:currentUser.id,p_pin:sessionPin,p_payload:payload,p_updated:up})
+      .then(({error})=>{
+        if(!error) return;
+        if(error.code==='PGRST202' || /could not find the function|does not exist/i.test(error.message||'')){
+          secureWrite=false; legacyPush(payload,up);   // ยังไม่ได้รัน SQL อัปเกรดความปลอดภัย → ใช้วิธีเดิมไปก่อน
+        } else if(/unauthorized/i.test(error.message||'')){
+          toast('❌ เซิร์ฟเวอร์ปฏิเสธการบันทึก — สิทธิ์/PIN ไม่ถูกต้อง');
+        } else { console.error(error); toast('⚠️ บันทึกขึ้นเซิร์ฟเวอร์ไม่สำเร็จ'); }
+      });
+  } else legacyPush(payload,up);
+}
+function legacyPush(payload,up){
+  sb.from(SUPABASE_TABLE).upsert({id:STATE_ID,payload:payload,updated_at:up})
+    .then(({error})=>{ if(error){console.error(error);toast('⚠️ บันทึกขึ้นเซิร์ฟเวอร์ไม่สำเร็จ');} });
 }
 function setSync(st){const dot=document.getElementById('syncdot'),txt=document.getElementById('syncstatus');
   const map={on:['#22c55e','ซิงก์เรียลไทม์'],connecting:['#f59e0b','กำลังเชื่อม...'],off:['#94a3b8','โหมดออฟไลน์ (คลิกเพื่อตั้งค่า)'],err:['#dc2626','เชื่อมต่อไม่ได้']};
@@ -831,7 +987,7 @@ function setUser(u){
 // เขียน session ลง sessionStorage (หายเมื่อปิดหน้าต่าง) พร้อมเวลาใช้งานล่าสุด
 function writeSession(){
   if(!currentUser) return;
-  try{sessionStorage.setItem(SESSION_KEY,JSON.stringify({name:currentUser.name,role:currentUser.role,last:Date.now()}));}catch(e){}
+  try{sessionStorage.setItem(SESSION_KEY,JSON.stringify({id:currentUser.id,last:Date.now(),p:sessionPin}));}catch(e){}
   // เผื่อ session เดิมที่เคยเก็บใน localStorage — ลบทิ้งเพื่อความปลอดภัย
   try{localStorage.removeItem('plaai_user');}catch(e){}
 }
@@ -847,23 +1003,51 @@ function buildLoginOptions(){
   const sel=document.getElementById('loginUser'); if(!sel) return;
   sel.innerHTML=USERS.map((u,i)=>`<option value="${i}">${u.name}</option>`).join('');
 }
-function doLogin(){
+async function doLogin(){
+  if(doLogin.busy) return;
   const sel=document.getElementById('loginUser');
-  const pin=(document.getElementById('loginPin').value||'').trim();
+  const pinEl=document.getElementById('loginPin');
   const err=document.getElementById('loginErr');
+  const now=Date.now();
+  if(now<loginLockUntil){err.textContent='ใส่ PIN ผิดหลายครั้ง — กรุณารออีก '+Math.ceil((loginLockUntil-now)/1000)+' วินาที';return;}
   const u=USERS[+sel.value];
+  const pin=(pinEl.value||'').trim();
   if(!u){err.textContent='ไม่พบผู้ใช้';return;}
-  if(String(u.pin)!==pin){err.textContent='รหัส PIN ไม่ถูกต้อง';return;}
-  err.textContent='';
+  if(!pin){err.textContent='กรุณาใส่ PIN';return;}
+  doLogin.busy=true; err.textContent='กำลังตรวจสอบ...';
+  let ok=false;
+  try{
+    const sv=await serverVerify(u.id,pin);                        // ตรวจกับเซิร์ฟเวอร์ก่อน (ปลอดภัยที่สุด)
+    ok=(sv===null)? (localPinHash(u.id,pin)===u.hash) : sv;       // เซิร์ฟเวอร์ยังไม่พร้อม → ตรวจแบบแฮชในเครื่อง
+  }finally{doLogin.busy=false;}
+  if(!ok){
+    loginFails++;
+    if(loginFails>=5){loginLockUntil=Date.now()+30000;loginFails=0;err.textContent='ใส่ PIN ผิดครบ 5 ครั้ง — พัก 30 วินาทีเพื่อความปลอดภัย';}
+    else err.textContent='รหัส PIN ไม่ถูกต้อง';
+    pinEl.value='';pinEl.focus();
+    return;
+  }
+  loginFails=0; err.textContent='';
+  sessionPin=pin; pinEl.value='';
   setUser(u);
   document.getElementById('loginOverlay').style.display='none';
   startApp();
+}
+// ตรวจ PIN กับ Supabase (ฟังก์ชัน plaai_verify_login) — คืน true/false หรือ null ถ้าเซิร์ฟเวอร์ยังไม่พร้อม/ยังไม่ติดตั้ง
+async function serverVerify(id,pin){
+  try{
+    await Promise.race([sbLibReady,new Promise(r=>setTimeout(r,4000))]);
+    if(!sb) return null;
+    const {data,error}=await sb.rpc('plaai_verify_login',{p_user_id:id,p_pin:pin});
+    if(error){console.warn('verify_login:',error.message);return null;}
+    return Array.isArray(data)? data.length>0 : !!data;
+  }catch(e){return null;}
 }
 function logout(reason){
   stopIdleWatch();
   try{sessionStorage.removeItem(SESSION_KEY);}catch(e){}
   try{localStorage.removeItem('plaai_user');}catch(e){}
-  currentUser=null; canEdit=false;
+  currentUser=null; canEdit=false; sessionPin=null;
   const chip=document.getElementById('userchip'); if(chip) chip.style.display='none';
   const pin=document.getElementById('loginPin'); if(pin) pin.value='';
   const err=document.getElementById('loginErr'); if(err) err.textContent=reason||'';
@@ -872,11 +1056,11 @@ function logout(reason){
 function restoreSession(){
   try{
     const s=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');
-    if(s && s.name){
+    if(s && s.id){
       // เผื่อแท็บถูกทิ้งไว้นานเกิน 30 นาที (เบราว์เซอร์อาจหยุดตัวจับเวลาในแท็บพื้นหลัง)
       if(s.last && (Date.now()-s.last)>IDLE_TIMEOUT_MS){ try{sessionStorage.removeItem(SESSION_KEY);}catch(e){} return false; }
-      const u=USERS.find(x=>x.name===s.name);
-      if(u){setUser(u);return true;}
+      const u=USERS.find(x=>x.id===s.id);
+      if(u){sessionPin=s.p||null;setUser(u);return true;}
     }
   }catch(e){}
   return false;
@@ -931,11 +1115,12 @@ function applyPerms(){
 }
 let appStarted=false;
 function startApp(){
-  if(!appStarted){ appStarted=true; initSupabase(); }
+  if(!appStarted){ appStarted=true; connectData(); }
   buildNav(); render(); renderAsOf(); renderUser();
 }
 
 // ================= INIT =================
+initSupabase();   // โหลดไลบรารี Supabase ไว้ก่อน (ยังไม่ดึงข้อมูลจนกว่าจะล็อกอิน)
 buildLoginOptions();
 if(restoreSession()){
   document.getElementById('loginOverlay').style.display='none';
