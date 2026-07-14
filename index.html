@@ -155,7 +155,7 @@ code{background:#f0ede6;padding:1px 6px;border-radius:4px;font-size:12.5px;}
     <input type="password" id="loginPin" inputmode="numeric" autocomplete="off" placeholder="ใส่ PIN" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="go" onclick="doLogin()">เข้าสู่ระบบ</button>
     <div class="err" id="loginErr"></div>
-    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี/ผู้จัดการโรงแรม = แก้ไขได้ · ผู้ชม = ดูอย่างเดียว<br>🔒 ระบบจะออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที</div>
+    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี = แก้ไขได้ (เห็นทุกหน้า) · ผู้จัดการโรงแรม = ดูอย่างเดียว เฉพาะโรงแรมของตนเอง + ภาพรวม<br>🔒 ระบบจะออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที</div>
   </div>
 </div>
 
@@ -218,18 +218,19 @@ const STATE_ID = "main";
 // ---------------------------------------------------------------------------------
 
 // ========== ผู้ใช้ + สิทธิ์ ==========
-// role: 'owner' | 'accountant' | 'manager' = แก้ไขได้  ·  'viewer' = ดูอย่างเดียว
+// role: 'owner' | 'accountant' = แก้ไขได้ (เห็นทุกแท็บ)  ·  'manager' = ดูอย่างเดียว (เห็นเฉพาะแท็บที่กำหนดใน tabs)
+// tabs: รายชื่อแท็บที่บัญชีนั้นเห็นได้ (ไม่ใส่ = เห็นทุกแท็บ) — คีย์แท็บ: combined(ภาพรวม), prime, play, saroj, bowin, bowin2, cash, construction(เงินก่อสร้าง), financing, setup
 // 🔒 ไม่เก็บ PIN ตรงๆ ในไฟล์อีกต่อไป — เก็บเป็นรหัสแฮช (SHA-256) เปิดดูซอร์สโค้ดก็ไม่เห็น PIN
 // วิธีเปลี่ยน PIN: หน้า "⚙️ ตั้งค่า/แชร์" → "🔑 เครื่องมือเปลี่ยน PIN" (สร้างโค้ดมาวางแทนค่า hash ด้านล่าง)
-// PIN ชุดเริ่มต้นยังเป็นชุดเดิมที่ทีมใช้อยู่ (ผู้ใช้ไม่ต้องเปลี่ยนวิธีใช้งาน) — แนะนำทยอยเปลี่ยนเป็น 6 หลักขึ้นไป
+// PIN ชุดเริ่มต้นยังเป็นชุดเดิมที่ทีมใช้อยู่ (ผู้ใช้ไม่ต้องเปลี่ยนวิธีใช้งาน) — รหัส/hash ไม่เปลี่ยน จึงล็อกอินด้วย PIN เดิมได้
 const PIN_SALT='PLAAI-CF-2026';
 const USERS = [
   {id:"owner",  name:"เจ้าของกิจการ (Owner)",       role:"owner",      hash:"9fd119619fac7565b1bae44a4036cbe1907c7ded67f69010d96547d7d6f46577"},
   {id:"acct",   name:"ฝ่ายบัญชี (Accounting)",       role:"accountant", hash:"d5a8b09ad3cd8c51e263c0cf63cf31ac4320b6d7b5590ef9c100966e4c6af500"},
-  {id:"mgr1",   name:"ผู้จัดการโรงแรม 1 (Manager)",  role:"manager",    hash:"7af53262507c7496e802942e2bcf6cf27f8d0f7aad43b84c8d3c10460220253e"},
-  {id:"mgr2",   name:"ผู้จัดการโรงแรม 2 (Manager)",  role:"manager",    hash:"4ac6c50061999beae68d8e1f946620bef619eb906c89d71ca300a20daba37bc3"},
-  {id:"mgr3",   name:"ผู้จัดการโรงแรม 3 (Manager)",  role:"manager",    hash:"10bba9eea02dc4bf875b76d7b3bb235b9802d2d9dad6fd3297ce4e1831a24101"},
-  {id:"viewer", name:"ผู้ชม (Viewer)",               role:"viewer",     hash:"23b81a81261dd8a9f2d2a2d5fdb258dfbecff938be696b4177a5c8da8ab1fbdc"}
+  {id:"mgr1",   name:"ผู้จัดการโรงแรม 1 (Prime)",    role:"manager",    hash:"7af53262507c7496e802942e2bcf6cf27f8d0f7aad43b84c8d3c10460220253e", tabs:["combined","prime"]},
+  {id:"mgr2",   name:"ผู้จัดการโรงแรม 2 (Saroj)",    role:"manager",    hash:"4ac6c50061999beae68d8e1f946620bef619eb906c89d71ca300a20daba37bc3", tabs:["combined","saroj"]},
+  {id:"mgr3",   name:"ผู้จัดการโรงแรม 3 (Play)",     role:"manager",    hash:"10bba9eea02dc4bf875b76d7b3bb235b9802d2d9dad6fd3297ce4e1831a24101", tabs:["combined","play"]},
+  {id:"viewer", name:"ผู้จัดการโรงแรม 4 (Bowin)",    role:"manager",    hash:"23b81a81261dd8a9f2d2a2d5fdb258dfbecff938be696b4177a5c8da8ab1fbdc", tabs:["combined","bowin","bowin2","construction"]}
 ];
 // SHA-256 (pure JS) — ใช้ตรวจ PIN ในเครื่อง เฉพาะกรณีเซิร์ฟเวอร์ยังไม่พร้อม (ปกติจะตรวจที่ Supabase)
 function sha256hex(ascii){
@@ -277,8 +278,12 @@ function sha256hex(ascii){
   return result;
 }
 function localPinHash(id,pin){ return sha256hex(PIN_SALT+'|'+id+'|'+pin); }
-const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม",viewer:"ดูอย่างเดียว"};
-const EDIT_ROLES=["owner","accountant","manager"];
+const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม (ดูอย่างเดียว)",viewer:"ดูอย่างเดียว"};
+const EDIT_ROLES=["owner","accountant"];
+// แท็บที่แต่ละบัญชีเห็นได้ (null = เห็นทุกแท็บ) — อ่านจาก currentUser.tabs
+function allowedTabs(){ return (currentUser && Array.isArray(currentUser.tabs)) ? currentUser.tabs : null; }
+function tabAllowed(t){ const a=allowedTabs(); return !a || a.includes(t); }
+function firstAllowedTab(){ const a=allowedTabs(); return (a && a.length)? a[0] : 'combined'; }
 let currentUser=null, canEdit=false, sessionPin=null, loginFails=0, loginLockUntil=0;
 // ===== ความปลอดภัย: ออกจากระบบเมื่อปิดหน้าต่าง + หมดเวลาเมื่อไม่มีการใช้งาน =====
 // เก็บ session ใน sessionStorage → ปิดหน้าต่าง/แท็บ = ออกจากระบบอัตโนมัติ
@@ -554,11 +559,14 @@ function buildNav(){
   const tabs=[['combined','📊 ภาพรวม'],
     ['prime','Prime'],['play','Play'],['saroj','Saroj'],['bowin','Bowin'],['bowin2','Bowin 2'],
     ['cash','💵 เงินสด & จ่ายเช็ค'],['construction','🏗️ เงินก่อสร้าง'],['financing','🏦 แผนปิดหนี้บริษัท'],['setup','⚙️ ตั้งค่า/แชร์']];
-  document.getElementById('nav').innerHTML=tabs.map(t=>`<button data-tab="${t[0]}" class="${t[0]===currentTab?'active':''}" onclick="showTab('${t[0]}')">${t[1]}</button>`).join('');
+  const allow=allowedTabs();
+  const shown=allow? tabs.filter(t=>allow.includes(t[0])) : tabs;
+  document.getElementById('nav').innerHTML=shown.map(t=>`<button data-tab="${t[0]}" class="${t[0]===currentTab?'active':''}" onclick="showTab('${t[0]}')">${t[1]}</button>`).join('');
 }
-function showTab(t){currentTab=t;buildNav();render();window.scrollTo(0,0);}
+function showTab(t){ if(!tabAllowed(t)){toast('🔒 บัญชีนี้ไม่มีสิทธิ์ดูหน้านี้');return;} currentTab=t;buildNav();render();window.scrollTo(0,0);}
 
 function render(){
+  if(!tabAllowed(currentTab)) currentTab=firstAllowedTab();
   const m=document.getElementById('main');
   if(currentTab==='construction') m.innerHTML=(consSub==='overview')?viewConstruction():viewConsDetail(consSub);
   else if(currentTab==='cash') m.innerHTML=viewCash();
@@ -1596,6 +1604,7 @@ function applyPerms(){
 let appStarted=false;
 function startApp(){
   if(!appStarted){ appStarted=true; connectData(); }
+  if(!tabAllowed(currentTab)) currentTab=firstAllowedTab();
   buildNav(); render(); renderAsOf(); renderUser();
 }
 
