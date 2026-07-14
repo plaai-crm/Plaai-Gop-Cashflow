@@ -155,7 +155,7 @@ code{background:#f0ede6;padding:1px 6px;border-radius:4px;font-size:12.5px;}
     <input type="password" id="loginPin" inputmode="numeric" autocomplete="off" placeholder="ใส่ PIN" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="go" onclick="doLogin()">เข้าสู่ระบบ</button>
     <div class="err" id="loginErr"></div>
-    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี = แก้ไขได้ · ผู้จัดการโรงแรม = ดูอย่างเดียว เห็นเฉพาะโรงแรมที่รับผิดชอบ<br>🔒 ระบบจะออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที</div>
+    <div class="hintbox">แต่ละคนมีชื่อและ PIN ของตัวเอง · เจ้าของกิจการ/บัญชี/ผู้จัดการโรงแรม = แก้ไขได้ · ผู้ชม = ดูอย่างเดียว<br>🔒 ระบบจะออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที</div>
   </div>
 </div>
 
@@ -166,6 +166,50 @@ const MONTH_TH={jan:'ม.ค.',feb:'ก.พ.',mar:'มี.ค.',apr:'เม.ย.
 const HOTEL_ORDER=['prime','play','saroj','bowin','bowin2'];
 const YEARS=['2026','2027','2028'];
 
+// map ชื่อโรงแรมในหน้าแผนหนี้ ↔ คีย์ตึกในระบบ
+const HOTEL_ALIAS={'plaai play':'play','play':'play','plus saroj':'saroj','saroj':'saroj','plaai plus สาโรจน์':'saroj','plaai plusbowin':'bowin','bowin':'bowin','plaai plus บ่อวิน':'bowin','plaai prime':'prime','prime':'prime'};
+const HOTEL_KW={prime:['prime','ไพร'],play:['play','เพลย์'],saroj:['saroj','สาโรจน์','สาโรช','ระยอง'],bowin2:['บ่อวิน 2','บ่อวิน2','bowin 2','bowin2'],bowin:['บ่อวิน','bowin']};
+function hotelKeyFromName(name){ if(!name) return ''; const k=(''+name).trim().toLowerCase();
+  if(HOTEL_ORDER.includes(k)) return k;
+  if(HOTEL_ALIAS[k]) return HOTEL_ALIAS[k];
+  for(const h of HOTEL_ORDER){ if((state.hotels[h].name||'').toLowerCase()===k) return h; }
+  for(const h of ['prime','play','saroj','bowin2','bowin']){ if(HOTEL_KW[h].some(w=>k.includes(w))) return h; }
+  return ''; }
+
+// ---------- เมล็ดข้อมูลสัญญาเงินกู้ (แก้ไข/เพิ่ม/ลบได้ ในหน้า "แผนปิดหนี้บริษัท") ----------
+const LOAN_SEED=[
+ {id:'L1',hotel:'Plaai Play',bank:'กรุงไทย',type:'เงินกู้',limit:17000000,balance:4720000,rate:0.0635,monthly:256000,note:''},
+ {id:'L3',hotel:'Plus saroj',bank:'กรุงเทพ',type:'เงินกู้',limit:60000000,balance:25692335.2,rate:0.0635,monthly:640000,note:''},
+ {id:'L4',hotel:'Plus saroj',bank:'กรุงเทพ',type:'เงินกู้',limit:15000000,balance:8706757.4,rate:0.0635,monthly:210000,note:''},
+ {id:'L5',hotel:'Plaai Plusbowin',bank:'กรุงเทพ',type:'เงินกู้',limit:70000000,balance:62608988.3,rate:0.0635,monthly:1000000,note:''},
+ {id:'L6',hotel:'Plaai Plusbowin',bank:'OD กรุงเทพ',type:'OD',limit:14000000,balance:14000000,rate:0.065,monthly:90000,note:'OD เป็นวงเงินหมุนเวียน ไม่มีกำหนดงวดจริง — วันปิดเป็นการประมาณ ยอด÷ชำระ'},
+ {id:'L7',hotel:'Plaai Plusbowin',bank:'OD กรุงไทย',type:'OD',limit:7000000,balance:7000000,rate:0.065,monthly:55000,note:'OD หมุนเวียน — วันปิดเป็นการประมาณ'},
+ {id:'L8',hotel:'Plaai Plusbowin',bank:'กสิกร',type:'เงินกู้',limit:3000000,balance:2107598.8,rate:0.0635,monthly:59800,note:''},
+ {id:'L9',hotel:'Plaai Plusbowin',bank:'OD กสิกร',type:'OD',limit:5000000,balance:4999956.5,rate:0.065,monthly:30000,note:'OD หมุนเวียน — วันปิดเป็นการประมาณ'},
+ {id:'L10',hotel:'Plaai Plusbowin',bank:'ราชธานีลิสซิ่ง',type:'เงินกู้',limit:4000000,balance:2904325.3,rate:0.0635,monthly:138506,note:'ปิดปีหน้า'},
+ {id:'L11',hotel:'Plaai Plusbowin',bank:'กรุงเทพ',type:'เงินกู้',limit:7000000,balance:5790656.7,rate:0.0635,monthly:87000,note:''},
+ {id:'L13',hotel:'Plaai Prime',bank:'กรุงเทพ',type:'เงินกู้',limit:100000000,balance:22763182.2,rate:0.0635,monthly:1000000,note:''},
+ {id:'L14',hotel:'Plaai Prime',bank:'SME',type:'เงินกู้',limit:4000000,balance:800682.5,rate:0.0635,monthly:55000,note:'ปิดปีหน้า'},
+ {id:'L15',hotel:'Plaai Prime',bank:'ออมสิน',type:'เงินกู้',limit:10000000,balance:5748287.2,rate:0.0635,monthly:150000,note:''},
+ {id:'L16',hotel:'Plaai Prime',bank:'ออมสิน',type:'เงินกู้',limit:4600000,balance:2999468.1,rate:0.0635,monthly:80000,note:''}
+];
+const NOTES_SEED=[
+ 'หลังจากภาระหนี้หมดไปบางส่วน คือ ประมาณ Jun 2028 จะขอปรับ incentive เพิ่มให้ Head prop ตามผลประกอบการจริงแต่ละตึก เพราะฉะนั้น ระบบประเมินจะต้องแข็งแรง ให้โอกาส HR เก่า 1 ปี แสดงความสามารถ - CUT ที่ Jun2027 (ตัวเลขยังไม่ Final ขอปรึกษาคุณโจก่อน)',
+ 'แบงค์ขออย่าเพิ่งปรับโครงสร้างหนี้',
+ 'ตกลงค่าเช่าอาคารและที่ดินตามเรทจริง + ราคาซื้อขาย ตึก Prime กับคุณโจอีกครั้ง (คุยในฐานะคุณโจเป็นเจ้าของอาคารและที่ดิน) หาราคา Fair price *ถ้าตกลงไม่ได้ ให้จัดจ้างผู้ประเมินที่เป็น 3th party',
+ 'ได้ราคา Fair price แล้ว ติดต่อ one law เพื่อปรึกษาการปรับโครงสร้างบริษัท *แนะนำให้ใช้ผู้เชี่ยวชาญ',
+ 'ย้ายค่าบ้านเดือนละ 87,000 ให้ Play จ่าย (เชคสัญญาว่าหมดเมื่อไหร่**)',
+ 'ยอดใหญ่หมดประมาณ Jun 2028 (ย้ายค่าบ้าน เดือนละ 250,000 + ยอด OD + Loan Kbank ให้ Prime) + เริ่ม วางแผน Renovate'
+];
+const LOAN_MLR=0.0635, LOAN_MOR=0.065, LOAN_ASOF='2026-05';
+// แหล่งเงินก่อสร้าง 3 หน้าย่อย (แก้ไข/เพิ่ม/ลบได้)
+const CONS_DETAIL_SEED={
+  bank:{name:'วงเงินกู้ก่อสร้างจากธนาคาร',creditLine:70000000,draws:[],uses:[]},
+  bowin1:{name:'เงินยืมจากโรงแรม Plaai Plus บ่อวิน 1',creditLine:0,draws:[],uses:[]},
+  owner:{name:'เงินยืมจาก Owner',creditLine:0,draws:[],uses:[]}
+};
+const CONS_KEYS=['bank','bowin1','owner'];
+
 // ---------- Supabase config: วางค่าจาก Supabase → Project Settings → API ----------
 const SUPABASE_URL = "https://qlnndvycciihakzuxzjf.supabase.co";// เช่น https://xxxxxxxx.supabase.co
 const SUPABASE_ANON_KEY = "sb_publishable_OqQmlwGTDMioAVb6VKFpMg_w6o9JUU1";   // วาง Publishable key (ขึ้นต้น sb_publishable_...) หรือ anon key เดิมถ้ามี
@@ -174,8 +218,7 @@ const STATE_ID = "main";
 // ---------------------------------------------------------------------------------
 
 // ========== ผู้ใช้ + สิทธิ์ ==========
-// role: 'owner' | 'accountant' = แก้ไขได้  ·  'manager' = ดูอย่างเดียว (เห็นเฉพาะโรงแรมที่รับผิดชอบ)  ·  'viewer' = ดูอย่างเดียว
-// 🔑 สิทธิ์การมองเห็นแท็บของผู้จัดการแต่ละคน กำหนดใน TAB_PERMS ด้านล่าง (ไม่ระบุ = เห็นทุกแท็บ)
+// role: 'owner' | 'accountant' | 'manager' = แก้ไขได้  ·  'viewer' = ดูอย่างเดียว
 // 🔒 ไม่เก็บ PIN ตรงๆ ในไฟล์อีกต่อไป — เก็บเป็นรหัสแฮช (SHA-256) เปิดดูซอร์สโค้ดก็ไม่เห็น PIN
 // วิธีเปลี่ยน PIN: หน้า "⚙️ ตั้งค่า/แชร์" → "🔑 เครื่องมือเปลี่ยน PIN" (สร้างโค้ดมาวางแทนค่า hash ด้านล่าง)
 // PIN ชุดเริ่มต้นยังเป็นชุดเดิมที่ทีมใช้อยู่ (ผู้ใช้ไม่ต้องเปลี่ยนวิธีใช้งาน) — แนะนำทยอยเปลี่ยนเป็น 6 หลักขึ้นไป
@@ -186,18 +229,8 @@ const USERS = [
   {id:"mgr1",   name:"ผู้จัดการโรงแรม 1 (Manager)",  role:"manager",    hash:"7af53262507c7496e802942e2bcf6cf27f8d0f7aad43b84c8d3c10460220253e"},
   {id:"mgr2",   name:"ผู้จัดการโรงแรม 2 (Manager)",  role:"manager",    hash:"4ac6c50061999beae68d8e1f946620bef619eb906c89d71ca300a20daba37bc3"},
   {id:"mgr3",   name:"ผู้จัดการโรงแรม 3 (Manager)",  role:"manager",    hash:"10bba9eea02dc4bf875b76d7b3bb235b9802d2d9dad6fd3297ce4e1831a24101"},
-  {id:"viewer", name:"ผู้จัดการโรงแรม 4 (Manager)",  role:"manager",    hash:"23b81a81261dd8a9f2d2a2d5fdb258dfbecff938be696b4177a5c8da8ab1fbdc"}
+  {id:"viewer", name:"ผู้ชม (Viewer)",               role:"viewer",     hash:"23b81a81261dd8a9f2d2a2d5fdb258dfbecff938be696b4177a5c8da8ab1fbdc"}
 ];
-// 🔑 สิทธิ์การมองเห็นแท็บ (key = id ผู้ใช้) · ไม่มีในรายการ = เห็นทุกแท็บ (เจ้าของกิจการ/บัญชี)
-// แท็บ: construction=เงินก่อสร้าง · combined=ภาพรวม · prime/play/saroj/bowin/bowin2 · setup=ตั้งค่า
-const TAB_PERMS = {
-  mgr1:   ["combined","prime"],                        // ผู้จัดการ 1 → Prime + ภาพรวม
-  mgr2:   ["combined","saroj"],                        // ผู้จัดการ 2 → Saroj + ภาพรวม
-  mgr3:   ["combined","play"],                         // ผู้จัดการ 3 → Play + ภาพรวม
-  viewer: ["combined","bowin","bowin2","construction"] // ผู้จัดการ 4 → Bowin, Bowin 2, ภาพรวม, เงินก่อสร้าง
-};
-function allowedTabs(){ return currentUser ? (TAB_PERMS[currentUser.id]||null) : null; }
-function canSeeTab(t){ const a=allowedTabs(); return !a || a.includes(t); }
 // SHA-256 (pure JS) — ใช้ตรวจ PIN ในเครื่อง เฉพาะกรณีเซิร์ฟเวอร์ยังไม่พร้อม (ปกติจะตรวจที่ Supabase)
 function sha256hex(ascii){
   function rr(v,a){return (v>>>a)|(v<<(32-a));}
@@ -244,8 +277,8 @@ function sha256hex(ascii){
   return result;
 }
 function localPinHash(id,pin){ return sha256hex(PIN_SALT+'|'+id+'|'+pin); }
-const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม (ดูอย่างเดียว)",viewer:"ดูอย่างเดียว"};
-const EDIT_ROLES=["owner","accountant"];   // เฉพาะเจ้าของกิจการ + บัญชี แก้ไขได้ · ผู้จัดการโรงแรม = ดูอย่างเดียว
+const ROLE_LABEL={owner:"เจ้าของกิจการ",accountant:"ฝ่ายบัญชี",manager:"ผู้จัดการโรงแรม",viewer:"ดูอย่างเดียว"};
+const EDIT_ROLES=["owner","accountant","manager"];
 let currentUser=null, canEdit=false, sessionPin=null, loginFails=0, loginLockUntil=0;
 // ===== ความปลอดภัย: ออกจากระบบเมื่อปิดหน้าต่าง + หมดเวลาเมื่อไม่มีการใช้งาน =====
 // เก็บ session ใน sessionStorage → ปิดหน้าต่าง/แท็บ = ออกจากระบบอัตโนมัติ
@@ -257,6 +290,8 @@ let idleTimer=null, lastActivityWrite=0;
 let state = loadLocal() || JSON.parse(JSON.stringify(SEED));
 migrate();
 let currentTab='combined';
+let consSub='overview';
+let financeRange=36;
 let currentYear={};HOTEL_ORDER.forEach(h=>currentYear[h]='2026');
 let charts={};
 let sb=null, applyingRemote=false;
@@ -298,6 +333,19 @@ function migrate(){
   if(!Array.isArray(state.settings.years)||!state.settings.years.length) state.settings.years=['2026','2027','2028'];
   if(!state.settings.openingCash) state.settings.openingCash={};
   HOTEL_ORDER.forEach(h=>{ if(state.settings.openingCash[h]==null) state.settings.openingCash[h]=0; });
+  // ---- โมดูลใหม่: บันทึกจ่ายเงินสด (เชค operation + financing) ----
+  if(!state.payments) state.payments={operation:[],financing:[]};
+  if(!Array.isArray(state.payments.operation)) state.payments.operation=[];
+  if(!Array.isArray(state.payments.financing)) state.payments.financing=[];
+  // ---- โมดูลใหม่: สัญญาเงินกู้ + โน้ตกลยุทธ์ (หน้าแผนปิดหนี้บริษัท) ----
+  if(!Array.isArray(state.loans)||!state.loans.length) state.loans=JSON.parse(JSON.stringify(LOAN_SEED));
+  if(!Array.isArray(state.loanNotes)) state.loanNotes=JSON.parse(JSON.stringify(NOTES_SEED));
+  if(!state.loanAsOf) state.loanAsOf=LOAN_ASOF;
+  // ---- โมดูลใหม่: รายละเอียดเงินก่อสร้าง 3 แหล่ง ----
+  if(!state.consDetail) state.consDetail=JSON.parse(JSON.stringify(CONS_DETAIL_SEED));
+  CONS_KEYS.forEach(k=>{ if(!state.consDetail[k]) state.consDetail[k]=JSON.parse(JSON.stringify(CONS_DETAIL_SEED[k]));
+    if(!Array.isArray(state.consDetail[k].draws)) state.consDetail[k].draws=[];
+    if(!Array.isArray(state.consDetail[k].uses)) state.consDetail[k].uses=[]; });
 }
 // forecast years (editable/growable), always sorted ascending
 function forecastYears(){ return (state.settings.years||['2026','2027','2028']).slice().sort((a,b)=>(+a)-(+b)); }
@@ -386,8 +434,29 @@ function cashNowVal(h){
   const v=state.hotels[h] && state.hotels[h].cashNow;
   return (v===undefined||v===null||v==='')?null:(+v);
 }
+// ---------- ตัดเงินสดอัตโนมัติ: รายการจ่าย (เชค operation + financing) ที่ถึงกำหนดจ่ายแล้ว ----------
+function ymdToNum(d){ if(!d) return 0; const p=(''+d).split('-'); return (+p[0]||0)*10000+(+p[1]||0)*100+(+p[2]||0); }
+function paymentDue(p){ const a=effAsOf(); return p.date && ymdToNum(p.date)<=ymdToNum(a.ymd); }
+function allPayments(){ return (state.payments&&state.payments.operation||[]).map(p=>Object.assign({_kind:'operation'},p))
+  .concat((state.payments&&state.payments.financing||[]).map(p=>Object.assign({_kind:'financing'},p))); }
+// เงินที่ "ถึงกำหนดจ่ายแล้ว" ของตึกนี้ (จะถูกตัดจาก cash on hand); kind='all'|'operation'|'financing'
+function dueDeductions(h,kind){
+  let sum=0;
+  const scan=(list)=>{ (list||[]).forEach(p=>{ if(p.void) return; if(hotelKeyFromName(p.hotel)!==h) return; if(paymentDue(p)) sum+=(+p.amount||0); }); };
+  if(!kind||kind==='all'||kind==='operation') scan(state.payments&&state.payments.operation);
+  if(!kind||kind==='all'||kind==='financing') scan(state.payments&&state.payments.financing);
+  return sum;
+}
+// รายการที่ยังไม่ถึงกำหนด (จะตัดในอนาคต) ของตึกนี้
+function pendingDeductions(h){
+  let sum=0;
+  allPayments().forEach(p=>{ if(p.void) return; if(hotelKeyFromName(p.hotel)!==h) return; if(!paymentDue(p)) sum+=(+p.amount||0); });
+  return sum;
+}
+// เงินสดพร้อมใช้ = เงินสดตั้งต้นที่กรอก − รายการที่ถึงกำหนดจ่ายแล้ว
+function effectiveCashNow(h){ const cn=cashNowVal(h); if(cn===null) return null; return cn - dueDeductions(h); }
 function anchorInfo(h){
-  const cn=cashNowVal(h);
+  const cn=effectiveCashNow(h);
   if(cn===null) return {has:false};
   const a=effAsOf();
   return {has:true,year:a.year,mi:a.mi,value:cn};
@@ -423,7 +492,7 @@ function yearMode(yr){
 // cash position for one hotel & year → {start, net, end, worst, mode, cashNowSet}
 function cashPosition(h,yr){
   const cs=cumulativeSeries(h,yr);
-  const a=effAsOf();const cn=cashNowVal(h);const oc=+(state.settings.openingCash[h]||0);
+  const a=effAsOf();const cn=effectiveCashNow(h);const oc=+(state.settings.openingCash[h]||0);
   const mode=yearMode(yr);
   let start,net;
   if(mode==='anchor'){
@@ -482,16 +551,18 @@ function setPath(obj,path,val){
 
 // ================= RENDER =================
 function buildNav(){
-  const tabs=[['construction','🏗️ เงินก่อสร้าง'],['combined','📊 ภาพรวม'],
-    ['prime','Prime'],['play','Play'],['saroj','Saroj'],['bowin','Bowin'],['bowin2','Bowin 2'],['setup','⚙️ ตั้งค่า/แชร์']];
-  const visible=tabs.filter(t=>canSeeTab(t[0]));
-  document.getElementById('nav').innerHTML=visible.map(t=>`<button data-tab="${t[0]}" class="${t[0]===currentTab?'active':''}" onclick="showTab('${t[0]}')">${t[1]}</button>`).join('');
+  const tabs=[['combined','📊 ภาพรวม'],
+    ['prime','Prime'],['play','Play'],['saroj','Saroj'],['bowin','Bowin'],['bowin2','Bowin 2'],
+    ['cash','💵 เงินสด & จ่ายเช็ค'],['construction','🏗️ เงินก่อสร้าง'],['financing','🏦 แผนปิดหนี้บริษัท'],['setup','⚙️ ตั้งค่า/แชร์']];
+  document.getElementById('nav').innerHTML=tabs.map(t=>`<button data-tab="${t[0]}" class="${t[0]===currentTab?'active':''}" onclick="showTab('${t[0]}')">${t[1]}</button>`).join('');
 }
-function showTab(t){ if(!canSeeTab(t))return; currentTab=t;buildNav();render();window.scrollTo(0,0);}
+function showTab(t){currentTab=t;buildNav();render();window.scrollTo(0,0);}
 
 function render(){
   const m=document.getElementById('main');
-  if(currentTab==='construction') m.innerHTML=viewConstruction();
+  if(currentTab==='construction') m.innerHTML=(consSub==='overview')?viewConstruction():viewConsDetail(consSub);
+  else if(currentTab==='cash') m.innerHTML=viewCash();
+  else if(currentTab==='financing') m.innerHTML=viewFinancing();
   else if(currentTab==='combined') m.innerHTML=viewCombined();
   else if(currentTab==='setup') m.innerHTML=viewSetup();
   else m.innerHTML=viewHotel(currentTab);
@@ -518,8 +589,9 @@ function viewConstruction(){
     <button class="mini danger" onclick="delItem(['construction','uses'],${i})">ลบ</button>
   </div>`).join('');
   return `<div class="card">
+    ${consSubNav()}
     <h2>🏗️ สรุปเงินก่อสร้าง — สำหรับเจ้าของกิจการ</h2>
-    <p class="hint">ภาพรวมว่าเงินที่เบิกจากธนาคาร (และเงินยืม) เอาไปใช้อะไรบ้าง แก้ไขตัวเลขได้ทุกช่อง กราฟวงกลมอัปเดตอัตโนมัติ</p>
+    <p class="hint">ภาพรวมว่าเงินที่เบิกจากธนาคาร (และเงินยืม) เอาไปใช้อะไรบ้าง แก้ไขตัวเลขได้ทุกช่อง กราฟวงกลมอัปเดตอัตโนมัติ · ดูรายละเอียดการเบิกแต่ละงวดได้ที่แท็บย่อยด้านบน</p>
     <div class="kpi">
       <div class="box"><div class="lbl">แหล่งเงินรวม (เงินที่หามาได้)</div><div class="val">${fmt(srcTotal)}</div><div class="cap">บาท</div></div>
       <div class="box"><div class="lbl">ใช้ไปแล้วรวม</div><div class="val">${fmt(useTotal)}</div><div class="cap">บาท</div></div>
@@ -553,6 +625,8 @@ function viewHotel(h){
   const hotel=state.hotels[h];const yr=currentYear[h];
   const openCash=+(state.settings.openingCash[h]||0);
   const cashNow=cashNowVal(h);
+  const dueDed=dueDeductions(h);const pendDed=pendingDeductions(h);
+  const availNow=(cashNow!==null)?(cashNow-dueDed):null;
   const cs=cumulativeSeries(h,yr);
   let rows='', tGop=0,tDebt=0,tFix=0,tNet=0;
   MONTHS.forEach((mo,idx)=>{
@@ -636,11 +710,21 @@ function viewHotel(h){
       <button class="mini primary" onclick="addDebtItem('${h}')">+ เพิ่มรายการหนี้</button>
       <div class="subtotal">รวมหนี้แบบ "ทุกเดือนทั้งปี": <b>${fmt(baseDebt(h))}</b> บาท/เดือน (รายการ "ระบุเดือนเดียว" จะบวกเพิ่มเฉพาะเดือนที่เลือก)</div>
     </div>
-    <div class="growthbox" style="background:#eef4fb;border-color:#cfe0f2">
-      <label>💵 เงินสดคงเหลือ ณ ปัจจุบัน (Cash on hand):</label>
-      <input type="number" value="${cashNow!==null?cashNow:''}" placeholder="ยังไม่ระบุ" onchange="editCashNow('${h}',this.value)">
-      <button class="mini" onclick="editCashNow('${h}','')" title="ล้างค่า">ล้าง</button>
-      <span class="hint">ใส่ยอดเงินสดจริงที่ตึกนี้มีอยู่ ณ วันที่ในมุมขวาบน · ระบบจะใช้ยอดนี้เป็นจุดตั้งต้นของ "เงินสดสะสม" ตั้งแต่เดือนปัจจุบัน (${MONTH_TH[effAsOf().mi>=0?MONTHS[effAsOf().mi]:'jan']} ${effAsOf().year}) เป็นต้นไป แล้วต่อยอดข้ามปีให้อัตโนมัติ เพื่อวางแผนตามความจริง · ถ้าเว้นว่าง = ใช้ "เงินสดตั้งต้น" ด้านล่างแทน</span>
+    <div class="growthbox" style="background:#eef4fb;border-color:#cfe0f2;display:block">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label>💵 เงินสดตั้งต้น ณ ปัจจุบัน (Cash on hand):</label>
+        <input type="number" value="${cashNow!==null?cashNow:''}" placeholder="ยังไม่ระบุ" onchange="editCashNow('${h}',this.value)">
+        <button class="mini" onclick="editCashNow('${h}','')" title="ล้างค่า">ล้าง</button>
+        <button class="mini" onclick="showTab('cash')" title="จัดการรายการจ่ายเงินสด/เชค">📋 จัดการรายการจ่าย</button>
+      </div>
+      ${cashNow!==null?`<div class="cashcalc" style="margin-top:12px">
+        <div class="item"><div class="lbl">เงินสดตั้งต้นที่กรอก</div><div class="num">${fmt0(cashNow)}</div></div>
+        <div class="op">−</div>
+        <div class="item"><div class="lbl">รายการจ่ายที่ถึงกำหนดแล้ว<br>(เชค + financing)</div><div class="num" style="color:var(--neg)">${fmt0(dueDed)}</div></div>
+        <div class="op">=</div>
+        <div class="item result" style="border-color:${availNow>=0?'var(--pos)':'var(--neg)'}"><div class="lbl">💰 เงินสดพร้อมใช้จริง ณ ตอนนี้</div><div class="num" style="color:${availNow>=0?'var(--pos)':'var(--neg)'};font-size:24px">${fmt0(availNow)}</div></div>
+      </div>
+      <div class="note" style="margin-top:8px;font-size:13px">ระบบตัดเงินอัตโนมัติเมื่อถึง "วันจ่าย" ของแต่ละรายการ (เทียบกับวันที่มุมขวาบน)${pendDed>0?` · ยังมีรายการรอตัดในอนาคตอีก <b>${fmt0(pendDed)}</b> บาท`:''} · เพิ่ม/นำเข้ารายการได้ที่แท็บ <b>💵 เงินสด &amp; จ่ายเช็ค</b></div>`:`<div class="note" style="margin-top:8px;font-size:13px">ใส่ยอดเงินสดจริงที่ตึกนี้มีอยู่ ณ วันที่มุมขวาบน · ระบบจะใช้เป็นจุดตั้งต้นของ "เงินสดสะสม" ตั้งแต่เดือนปัจจุบัน (${MONTH_TH[effAsOf().mi>=0?MONTHS[effAsOf().mi]:'jan']} ${effAsOf().year}) แล้วต่อยอดข้ามปีอัตโนมัติ · ถ้าเว้นว่าง = ใช้ "เงินสดตั้งต้น" ด้านล่างแทน</div>`}
     </div>
     <div class="growthbox" style="background:#faf8f3;border-color:var(--line)">
       <label>เงินสดตั้งต้น (ยกมาต้นปี) ${yr}:</label>
@@ -672,7 +756,7 @@ function viewCombined(){
   let cStart=0,cNet=0,cEnd=0,anyCashNow=false;const monthCum=Array(12).fill(0);
   let hotelRows=HOTEL_ORDER.map(h=>{
     let net=0;MONTHS.forEach(mo=>net+=netCF(h,yr,mo));
-    const cn=cashNowVal(h); if(cn!==null) anyCashNow=true;
+    const cn=effectiveCashNow(h); if(cn!==null) anyCashNow=true;
     const p=cashPosition(h,yr); cStart+=p.start; cNet+=p.net; cEnd+=p.end;
     if(active.includes(h)) cumulativeSeries(h,yr).arr.forEach((v,i)=>monthCum[i]+=v);
     const uc=state.hotels[h].underConstruction?' <span class="pill" style="background:#ede9fe;color:#6d28d9;font-size:10px">กำลังก่อสร้าง</span>':'';
@@ -709,6 +793,305 @@ function viewCombined(){
 }
 function hasData(h,yr){return MONTHS.some(m=>resolveGOP(h,yr,m).v!==null);}
 
+// ============================================================
+// ===============  โมดูลใหม่: helper ร่วม  ====================
+// ============================================================
+const MONTH_EN3=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function ymTh(d){ if(!d) return '-'; const p=(''+d).split('-'); return MONTH_EN3[(+p[1]||1)-1]+' '+p[0]; }
+function addMonths(y,m,k){ const idx=(m-1)+k; const ny=y+Math.floor(idx/12); const nm=(idx%12)+1; return ny+'-'+String(nm).padStart(2,'0'); }
+function numParse(v){ if(typeof v==='number') return v; if(v==null) return 0; return parseFloat((''+v).replace(/[,\s฿]/g,''))||0; }
+function hotelOpts(cur){ return HOTEL_ORDER.map(h=>`<option value="${h}" ${cur===h?'selected':''}>${state.hotels[h].name}</option>`).join(''); }
+
+// ---------- CSV / Excel helpers ----------
+let _xlsxReady=null;
+function ensureXLSX(){ if(window.XLSX) return Promise.resolve(); if(_xlsxReady) return _xlsxReady;
+  _xlsxReady=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload=()=>res(); s.onerror=()=>{ _xlsxReady=null; rej(new Error('โหลดไลบรารี Excel ไม่สำเร็จ (ตรวจอินเทอร์เน็ต)')); }; document.head.appendChild(s); });
+  return _xlsxReady; }
+function parseCSV(text){ const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else { if(c==='"') q=true; else if(c===','){row.push(cur);cur='';} else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';} else if(c==='\r'){} else cur+=c; } }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.some(x=>(''+x).trim()!=='')); }
+function colIndex(hdr,keys){ for(let i=0;i<hdr.length;i++){ const h=(''+hdr[i]).trim().toLowerCase(); if(keys.some(k=>h.includes(k))) return i; } return -1; }
+function normDate(v){ if(v===null||v===undefined||v==='') return '';
+  if(typeof v==='number'){ const d=new Date(Math.round((v-25569)*86400*1000)); if(!isNaN(d)) return d.toISOString().slice(0,10); }
+  let s=(''+v).trim(); let m=s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if(m){ let y=+m[1]; if(y>2400)y-=543; return y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'); }
+  m=s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if(m){ let y=+m[3]; if(y<100)y+=2000; if(y>2400)y-=543; return y+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[1]).padStart(2,'0'); }
+  return s; }
+function downloadCSV(aoa,fname){ const esc=v=>{ const s=(v===null||v===undefined)?'':(''+v); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const txt='﻿'+aoa.map(r=>r.map(esc).join(',')).join('\r\n');
+  const b=new Blob([txt],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=fname; a.click(); }
+
+// ============================================================
+// ===============  หน้า: เงินสด & จ่ายเช็ค  ===================
+// ============================================================
+function paySummaryRows(){
+  return HOTEL_ORDER.map(h=>{
+    const cn=cashNowVal(h); if(cn===null && dueDeductions(h)===0 && pendingDeductions(h)===0) return '';
+    const due=dueDeductions(h), pend=pendingDeductions(h), avail=(cn===null?null:cn-due);
+    return `<tr><td>${state.hotels[h].name}</td>
+      <td>${cn===null?'<span style="color:var(--muted)">ยังไม่ระบุ</span>':fmt0(cn)}</td>
+      <td class="neg">${due?('-'+fmt0(due)):'0'}</td>
+      <td class="${avail!=null&&avail<0?'neg':'pos'}"><b>${avail===null?'–':fmt0(avail)}</b></td>
+      <td style="color:#9a6b00">${pend?fmt0(pend):'0'}</td></tr>`;
+  }).join('');
+}
+function payTable(kind){
+  const list=state.payments[kind]||[];
+  const idKey=kind==='operation'?'cheqNo':'ref';
+  const idLabel=kind==='operation'?'เลขที่เชค':'เลขที่อ้างอิง';
+  const dateLabel=kind==='operation'?'วันที่จ่าย':'วันที่ตัดเงิน';
+  let body;
+  if(!list.length) body=`<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">ยังไม่มีรายการ — กด "➕ เพิ่มแถว" หรือ "⬆️ นำเข้าไฟล์"</td></tr>`;
+  else body=list.map((p,i)=>{
+    const due=p.date?paymentDue(p):null; const hk=hotelKeyFromName(p.hotel);
+    return `<tr>
+      <td style="text-align:left"><input class="cell" style="width:120px;text-align:left" value="${(''+(p[idKey]||'')).replace(/"/g,'&quot;')}" onchange="editPay('${kind}',${i},'${idKey}',this.value)"></td>
+      <td style="text-align:left"><select onchange="editPay('${kind}',${i},'hotel',this.value)"><option value="">— เลือกตึก —</option>${hotelOpts(hk)}</select></td>
+      <td style="text-align:left"><input class="cell" style="width:200px;text-align:left" value="${(p.item||'').replace(/"/g,'&quot;')}" onchange="editPay('${kind}',${i},'item',this.value)"></td>
+      <td><input class="cell" value="${p.amount||0}" onchange="editPay('${kind}',${i},'amount',this.value)"></td>
+      <td><input class="cell" type="date" style="width:150px" value="${p.date||''}" onchange="editPay('${kind}',${i},'date',this.value)"></td>
+      <td>${p.date?(due?'<span class="pill" style="background:#fdecea;color:#8a2a1c">✓ ตัดแล้ว</span>':'<span class="pill" style="background:#fff3da;color:#9a6b00">⏳ รอตัด</span>'):'<span class="pill">—</span>'}</td>
+      <td><button class="mini danger" onclick="delPay('${kind}',${i})">ลบ</button></td>
+    </tr>`;
+  }).join('');
+  const total=list.reduce((s,p)=>s+(+p.amount||0),0);
+  return `<div class="tblwrap"><table>
+    <thead><tr><th style="text-align:left">${idLabel}</th><th style="text-align:left">โรงแรม</th><th style="text-align:left">รายการจ่าย</th><th>ยอดจ่าย</th><th>${dateLabel}</th><th>สถานะ</th><th></th></tr></thead>
+    <tbody>${body}<tr class="total"><td colspan="3">รวม ${list.length} รายการ</td><td>${fmt0(total)}</td><td colspan="3"></td></tr></tbody>
+  </table></div>`;
+}
+function viewCash(){
+  const a=effAsOf();
+  return `<div class="card">
+    <h2>💵 เงินสด &amp; จ่ายเช็ค — บันทึกจ่ายเงินสดจริง</h2>
+    <p class="hint">แยกเงินจ่ายจริงเป็น 2 ฝั่ง: <b>Operation</b> (จ่ายเป็นเช็ค มีเลขที่เช็ค) และ <b>Financing</b> (ตัดบัญชีอัตโนมัติ) · เมื่อถึง "วันจ่าย" ของแต่ละรายการ (เทียบกับวันที่ ${thaiDate(a.ymd)} มุมขวาบน) ระบบจะ<b>ตัดเงิน Cash on hand ให้อัตโนมัติ</b> · นำเข้าไฟล์ Excel/CSV ได้ ระบบจับคู่ด้วย<b>เลขที่เช็ค</b>เพื่อกันรายการซ้ำ</p>
+    <div class="callout">🧮 <b>วิธีคิด:</b> เงินสดพร้อมใช้ = เงินสดตั้งต้นที่กรอกในหน้าแต่ละตึก − ผลรวมรายการที่ "ถึงกำหนดจ่ายแล้ว" · รายการที่ยังไม่ถึงวันจ่ายจะยังไม่ถูกตัด (โชว์เป็น "รอตัด") · แก้วันที่ = ย้อนกลับได้ ไม่มีการลบยอดถาวร</div>
+    <div class="tblwrap" style="margin-bottom:8px"><table>
+      <thead><tr><th style="text-align:left">โรงแรม</th><th>เงินสดตั้งต้น</th><th>ตัดแล้ว (ถึงกำหนด)</th><th>💰 พร้อมใช้จริง</th><th>รอตัด (อนาคต)</th></tr></thead>
+      <tbody>${paySummaryRows()||'<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีข้อมูล — กรอกเงินสดตั้งต้นในหน้าตึก หรือเพิ่มรายการจ่ายด้านล่าง</td></tr>'}</tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <h2>🧾 ฝั่ง Operation — จ่ายด้วยเช็ค (มีเลขที่เช็ค)</h2>
+    <p class="hint">แต่ละตึกจ่ายค่าดำเนินงานเป็นเช็ค — ระบุ เลขที่เช็ค · โรงแรม · รายการจ่าย · ยอด · วันที่จ่าย · เมื่อถึงวันจ่าย ระบบตัด Cash on hand อัตโนมัติ</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="mini primary" onclick="addPay('operation')">➕ เพิ่มแถว</button>
+      <button class="mini gold" onclick="document.getElementById('impOp').click()">⬆️ นำเข้า Excel/CSV</button>
+      <input type="file" id="impOp" style="display:none" accept=".csv,.xlsx,.xls,.txt" onchange="importPay('operation',this)">
+      <button class="mini" onclick="exportPay('operation','xlsx')">⬇️ Export Excel</button>
+      <button class="mini" onclick="exportPay('operation','csv')">⬇️ Export CSV</button>
+      <button class="mini" onclick="downloadTemplate('operation')">📄 ดาวน์โหลดเทมเพลต</button>
+    </div>
+    ${payTable('operation')}
+  </div>
+
+  <div class="card">
+    <h2>🏦 ฝั่ง Financing — ตัดบัญชีอัตโนมัติ</h2>
+    <p class="hint">รายการที่ธนาคารตัดบัญชีอัตโนมัติ — ระบุ รายการ · ยอดเงิน · วันที่ตัดเงิน · เมื่อถึงวันตัด ระบบหักออกจาก Cash on hand ของตึกที่ระบุ</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="mini primary" onclick="addPay('financing')">➕ เพิ่มแถว</button>
+      <button class="mini gold" onclick="document.getElementById('impFin').click()">⬆️ นำเข้า Excel/CSV</button>
+      <input type="file" id="impFin" style="display:none" accept=".csv,.xlsx,.xls,.txt" onchange="importPay('financing',this)">
+      <button class="mini" onclick="exportPay('financing','xlsx')">⬇️ Export Excel</button>
+      <button class="mini" onclick="exportPay('financing','csv')">⬇️ Export CSV</button>
+      <button class="mini" onclick="downloadTemplate('financing')">📄 ดาวน์โหลดเทมเพลต</button>
+    </div>
+    ${payTable('financing')}
+    <p class="legend" style="margin-top:12px">รูปแบบไฟล์นำเข้า: หัวคอลัมน์ควรมีคำว่า <code>เลขที่เช็ค/อ้างอิง</code>, <code>โรงแรม</code>, <code>รายการ</code>, <code>ยอด</code>, <code>วันที่</code> (ภาษาไทยหรืออังกฤษก็ได้) · วันที่รับได้ทั้ง 2026-07-20, 20/07/2026 หรือปี พ.ศ. · ระบบจับคู่เลขที่เช็คซ้ำให้อัตโนมัติ (อัปเดตทับ ไม่เพิ่มซ้ำ)</p>
+  </div>`;
+}
+
+// ============================================================
+// ===========  หน้า: แผนปิดหนี้บริษัท (Financing)  ============
+// ============================================================
+function loanPayoffInfo(l){
+  const r=(+l.rate||0)/12, bal=+l.balance||0, pay=+l.monthly||0;
+  const [ay,am]=(state.loanAsOf||LOAN_ASOF).split('-').map(Number);
+  const revolving=/od/i.test((l.type||''))||/\bod\b/i.test((l.bank||''));  // OD = วงเงินหมุนเวียน ไม่มีวันปิดตายตัว
+  if(bal<=0) return {months:0,date:state.loanAsOf,payable:true};
+  const interest=bal*r;
+  if(revolving || pay<=interest+0.01) return {months:Infinity,date:null,payable:false};
+  const n=Math.ceil(-Math.log(1-bal*r/pay)/Math.log(1+r));
+  if(!isFinite(n)||n>600) return {months:Infinity,date:null,payable:false};
+  return {months:n,date:addMonths(ay,am,n),payable:true};
+}
+function loanSchedule(maxMonths){
+  const [ay,am]=(state.loanAsOf||LOAN_ASOF).split('-').map(Number);
+  const loans=state.loans.map(l=>({hk:hotelKeyFromName(l.hotel), bal:+l.balance||0, rate:(+l.rate||0)/12, monthly:+l.monthly||0}));
+  const rows=[];
+  for(let m=0;m<=maxMonths;m++){
+    const row={m,date:addMonths(ay,am,m),total_pay:0,total_bal:0,payHotel:{},balHotel:{}};
+    loans.forEach(l=>{ let pay=0;
+      if(m>0 && l.bal>0.5){ const interest=l.bal*l.rate;
+        if(l.monthly<=interest+0.01){ pay=l.monthly; } // OD/interest-only: จ่ายแต่ยอดคงเดิม
+        else { pay=Math.min(l.monthly, l.bal+interest); l.bal=Math.max(0,l.bal+interest-pay); } }
+      row.total_pay+=pay; row.total_bal+=l.bal;
+      if(l.hk){ row.payHotel[l.hk]=(row.payHotel[l.hk]||0)+pay; row.balHotel[l.hk]=(row.balHotel[l.hk]||0)+l.bal; }
+    });
+    rows.push(row);
+  }
+  return rows;
+}
+function viewFinancing(){
+  const loans=state.loans;
+  const payoffs=loans.map(loanPayoffInfo);
+  const totalBal=loans.reduce((s,l)=>s+(+l.balance||0),0);
+  const totalMonthly=loans.reduce((s,l)=>s+(+l.monthly||0),0);
+  // debt-free (term loans เท่านั้น)
+  let debtFree=null,maxM=0,perpCount=0;
+  payoffs.forEach(p=>{ if(!p.payable){perpCount++;return;} if(p.months>maxM){maxM=p.months;debtFree=p.date;} });
+  const yrsToFree=(maxM/12);
+  // groups per hotel
+  const groups={};
+  loans.forEach((l,i)=>{ const hk=hotelKeyFromName(l.hotel); const name=hk?state.hotels[hk].name:(l.hotel||'ไม่ระบุ');
+    const key=hk||('x_'+(l.hotel||i)); if(!groups[key]) groups[key]={name,hk,balance:0,monthly:0,last:null,perp:false};
+    groups[key].balance+=+l.balance||0; groups[key].monthly+=+l.monthly||0;
+    const po=payoffs[i]; if(!po.payable) groups[key].perp=true; else if(!groups[key].last||po.date>groups[key].last) groups[key].last=po.date; });
+  const gArr=Object.values(groups);
+  let soonest=null; gArr.forEach(g=>{ if(g.last && !g.perp && (!soonest||g.last<soonest.last)) soonest=g; });
+  // horizon drop
+  const sched=loanSchedule(financeRange);
+  const dropAmt=sched[0].total_bal - sched[sched.length-1].total_bal;
+  const hero=debtFree
+    ? `<div class="cashpanel pos" style="background:linear-gradient(120deg,#eaf6ef,#f3ead6);border-color:#bfe3cd">
+         <div class="verdict" style="color:#12603a">🎯 วันปลอดหนี้ (เงินกู้แบบมีกำหนด): ${ymTh(debtFree)}</div>
+         <div class="note" style="font-size:14.5px">อีกประมาณ <b>${yrsToFree.toFixed(1)} ปี</b> จากวันที่ตั้งต้น (${ymTh(state.loanAsOf)}) หนี้เงินกู้ที่มีกำหนดผ่อนจะหมด ✨${perpCount?` · ยังมีวงเงินหมุนเวียน (OD) ${perpCount} รายการที่จ่ายดอกต่อเนื่อง ไม่มีวันปิดตายตัว (ดูในตาราง)`:''}</div>
+       </div>`
+    : `<div class="cashpanel neg"><div class="verdict">ยังคำนวณวันปลอดหนี้ไม่ได้</div><div class="note">ตรวจว่ายอดผ่อน/เดือนมากกว่าดอกเบี้ยของแต่ละสัญญา</div></div>`;
+  const groupCards=gArr.map(g=>`<div class="box" style="border-left-color:${g.hk?state.hotels[g.hk].color:'#94a3b8'}">
+      <div class="lbl">${g.name}</div>
+      <div class="val" style="font-size:19px">${fmt0(g.balance)}</div>
+      <div class="cap">ผ่อน/เดือน ${fmt0(g.monthly)} · ปิด ${g.perp?'มี OD หมุนเวียน':(g.last?ymTh(g.last):'–')}</div>
+    </div>`).join('');
+  const loanRows=loans.map((l,i)=>{ const po=payoffs[i]; const hk=hotelKeyFromName(l.hotel);
+    return `<tr>
+      <td style="text-align:left"><input class="cell" style="width:150px;text-align:left" value="${(l.hotel||'').replace(/"/g,'&quot;')}" onchange="editLoan(${i},'hotel',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:110px;text-align:left" value="${(l.bank||'').replace(/"/g,'&quot;')}" onchange="editLoan(${i},'bank',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:70px;text-align:left" value="${(l.type||'').replace(/"/g,'&quot;')}" onchange="editLoan(${i},'type',this.value)"></td>
+      <td><input class="cell" value="${l.limit||0}" onchange="editLoan(${i},'limit',this.value)"></td>
+      <td><input class="cell" value="${Math.round(l.balance||0)}" onchange="editLoan(${i},'balance',this.value)"></td>
+      <td><input class="cell" style="width:70px" value="${((+l.rate||0)*100).toFixed(2)}" onchange="editLoan(${i},'rate',this.value)"></td>
+      <td><input class="cell" value="${l.monthly||0}" onchange="editLoan(${i},'monthly',this.value)"></td>
+      <td>${po.payable?(po.months/12).toFixed(1):'∞ (OD)'}</td>
+      <td style="text-align:left">${po.payable?ymTh(po.date):'หมุนเวียน'}<br><input class="cell" style="width:150px;text-align:left;font-size:12px" placeholder="โน้ต/คอมเมนต์" value="${(l.note||'').replace(/"/g,'&quot;')}" onchange="editLoan(${i},'note',this.value)"></td>
+      <td><button class="mini danger" onclick="delLoan(${i})">ลบ</button></td>
+    </tr>`;
+  }).join('');
+  const noteItems=state.loanNotes.map((n,i)=>`<li style="align-items:flex-start">
+      <div style="display:flex;gap:8px;width:100%"><b style="white-space:nowrap">${i+1}.</b>
+      <textarea rows="2" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:inherit;font-size:13px;resize:vertical" onchange="editLoanNote(${i},this.value)">${(n||'').replace(/</g,'&lt;')}</textarea>
+      <button class="mini danger" onclick="delLoanNote(${i})">ลบ</button></div>
+    </li>`).join('');
+  const rangeBtns=[24,36,48,60].map(mm=>`<button class="${financeRange===mm?'active':''}" onclick="setFinanceRange(${mm})">${mm} เดือน (${(mm/12)} ปี)</button>`).join('');
+  return `<div class="card" style="border-top:3px solid var(--gold)">
+    <h2>🏦 แผนปิดหนี้บริษัท (Financing รวมทั้งเครือ)</h2>
+    <p class="hint">แยกจากส่วนกระแสเงินสดหลัก — โฟกัสที่ภาระหนี้ทั้งบริษัทและ "วันปลอดหนี้" · ทุกตัวเลข (ยอดคงเหลือ/ดอกเบี้ย/ผ่อน) แก้ได้ กราฟและวันปิดหนี้คำนวณสดทันที · เพิ่ม/ลดสัญญาได้ · ใส่โน้ต/คอมเมนต์ตามจุดสำคัญได้</p>
+    <div class="growthbox" style="background:#eef4fb;border-color:#cfe0f2">
+      <label>📅 วันที่ตั้งต้นคำนวณ (as-of):</label>
+      <input type="month" value="${state.loanAsOf||LOAN_ASOF}" onchange="editLoanAsOf(this.value)" style="width:150px">
+      <span class="hint">ใช้เป็นเดือนเริ่มนับการผ่อน — เปลี่ยนได้ตามยอดคงเหลือล่าสุดที่กรอก</span>
+    </div>
+    ${hero}
+    <div class="kpi">
+      <div class="box" style="border-left-color:var(--neg)"><div class="lbl">ยอดหนี้คงเหลือรวม</div><div class="val" style="color:var(--neg)">${fmt0(totalBal)}</div><div class="cap">${loans.length} สัญญา</div></div>
+      <div class="box"><div class="lbl">ผ่อนชำระรวม / เดือน</div><div class="val">${fmt0(totalMonthly)}</div><div class="cap">เงินสดที่ต้องเตรียมจ่ายแบงก์</div></div>
+      <div class="box" style="border-left-color:var(--pos)"><div class="lbl">โรงแรมที่ปิดหนี้เร็วสุด</div><div class="val" style="font-size:18px;color:var(--pos)">${soonest?soonest.name:'–'}</div><div class="cap">${soonest?('คาดปิด '+ymTh(soonest.last)):''}</div></div>
+      <div class="box"><div class="lbl">ภาระลดลงในช่วง ${financeRange/12} ปี</div><div class="val">${fmt0(dropAmt)}</div><div class="cap">${ymTh(sched[0].date)} → ${ymTh(sched[sched.length-1].date)}</div></div>
+    </div>
+    <h3 style="font-size:15px;margin:6px 0 10px">ภาระหนี้รายโรงแรม</h3>
+    <div class="kpi">${groupCards}</div>
+  </div>
+
+  <div class="card">
+    <h2>📉 แนวโน้มยอดผ่อน &amp; หนี้คงเหลือ</h2>
+    <div class="yrtabs">${rangeBtns}</div>
+    <canvas id="finPayChart" height="120"></canvas>
+    <p class="hint" style="margin:14px 0 6px">ยอดหนี้คงเหลือรวม (เส้นประ) ลดลงตามเวลา · แท่ง = ยอดผ่อน/เดือน แยกสีตามโรงแรม</p>
+    <canvas id="finBalChart" height="120" style="margin-top:10px"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>📋 รายละเอียดสัญญาเงินกู้ (${loans.length} สัญญา) — แก้ได้ทุกช่อง</h2>
+    <p class="hint">แก้ยอด/ดอกเบี้ย/ผ่อน แล้ววันปิดหนี้และกราฟจะคำนวณใหม่ทันที · ดอกเบี้ยใส่เป็น % ต่อปี (เช่น 6.35)</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th style="text-align:left">โรงแรม</th><th style="text-align:left">ธนาคาร</th><th style="text-align:left">ประเภท</th><th>วงเงินกู้</th><th>ยอดคงเหลือ</th><th>ดอก%/ปี</th><th>ผ่อน/เดือน</th><th>เหลือ(ปี)</th><th style="text-align:left">คาดปิด / โน้ต</th><th></th></tr></thead>
+      <tbody>${loanRows}<tr class="total"><td colspan="3">รวม</td><td></td><td>${fmt0(totalBal)}</td><td></td><td>${fmt0(totalMonthly)}</td><td colspan="3"></td></tr></tbody>
+    </table></div>
+    <button class="mini primary" style="margin-top:12px" onclick="addLoan()">+ เพิ่มสัญญาเงินกู้</button>
+  </div>
+
+  <div class="card">
+    <h2>📝 แผนกระแสเงินสด &amp; ข้อควรพิจารณา (แก้ไข/เพิ่มโน้ตได้)</h2>
+    <p class="hint">บันทึกประเด็นสำคัญสำหรับที่ประชุมผู้บริหาร — แก้ข้อความในกล่องได้เลย</p>
+    <ul class="notes-list-fin" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px">${noteItems}</ul>
+    <button class="mini primary" style="margin-top:12px" onclick="addLoanNote()">+ เพิ่มโน้ต</button>
+    <p class="legend" style="margin-top:14px">ตัวเลขเป็นการประมาณการเพื่อวางแผน อ้างอิงอัตราดอกเบี้ยที่กรอกในแต่ละสัญญา — โปรดตรวจยอดจริงกับธนาคารก่อนตัดสินใจ</p>
+  </div>`;
+}
+
+// ============================================================
+// ===========  หน้า: เงินก่อสร้าง (รายละเอียด 3 แหล่ง)  ======
+// ============================================================
+function consSubNav(){
+  const tabs=[['overview','ภาพรวม'],['bank','แบงก์ 70 ล้าน'],['bowin1','เงินยืมบ่อวิน 1'],['owner','เงินยืม Owner']];
+  return `<div class="yrtabs" style="margin-bottom:16px">${tabs.map(t=>`<button class="${consSub===t[0]?'active':''}" onclick="setConsSub('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
+}
+function viewConsDetail(key){
+  const s=state.consDetail[key];
+  const isBank=key==='bank';
+  const drawn=s.draws.reduce((a,d)=>a+(+d.amount||0),0);
+  const used=s.uses.reduce((a,u)=>a+(+u.amount||0),0);
+  const creditLeft=(+s.creditLine||0)-drawn;
+  const cashInHand=drawn-used;
+  const drawRows=s.draws.length? s.draws.map((d,i)=>`<tr>
+      <td><input class="cell" type="date" style="width:150px" value="${d.date||''}" onchange="editConsDraw('${key}',${i},'date',this.value)"></td>
+      <td><input class="cell" value="${d.amount||0}" onchange="editConsDraw('${key}',${i},'amount',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:260px;text-align:left" value="${(d.note||'').replace(/"/g,'&quot;')}" placeholder="เช่น เบิกงวดแรก / รับเงินเข้า" onchange="editConsDraw('${key}',${i},'note',this.value)"></td>
+      <td><button class="mini danger" onclick="delConsDraw('${key}',${i})">ลบ</button></td></tr>`).join('')
+    : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการเบิก — กด "➕ เพิ่มงวดเบิก"</td></tr>`;
+  const useRows=s.uses.length? s.uses.map((u,i)=>`<tr>
+      <td><input class="cell" type="date" style="width:150px" value="${u.date||''}" onchange="editConsUse('${key}',${i},'date',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:240px;text-align:left" value="${(u.item||'').replace(/"/g,'&quot;')}" placeholder="ใช้ทำอะไร" onchange="editConsUse('${key}',${i},'item',this.value)"></td>
+      <td><input class="cell" value="${u.amount||0}" onchange="editConsUse('${key}',${i},'amount',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:160px;text-align:left" value="${(u.note||'').replace(/"/g,'&quot;')}" placeholder="หมายเหตุ" onchange="editConsUse('${key}',${i},'note',this.value)"></td>
+      <td><button class="mini danger" onclick="delConsUse('${key}',${i})">ลบ</button></td></tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการใช้เงิน — กด "➕ เพิ่มรายการใช้เงิน"</td></tr>`;
+  return `<div class="card">
+    ${consSubNav()}
+    <h2>🏗️ ${s.name}</h2>
+    <p class="hint">${isBank?'วงเงินกู้ก่อสร้างจากธนาคาร แก้ยอดวงเงินได้ · บันทึกการเบิกแต่ละงวด (วันที่ · ยอด) และเงินที่ใช้ไป เพื่อรู้ว่าเหลือวงเงินและเงินสดในมือเท่าไหร่':'บันทึกเงินยืมที่รับเข้ามาแต่ละครั้ง และการใช้เงิน · ตั้งเพดานวงเงิน (ถ้ามี) ได้'}</p>
+    <div class="growthbox" style="background:#faf6ee;border-color:#ece2cd">
+      <label>${isBank?'💳 วงเงินกู้ธนาคารรวม:':'💳 เพดานวงเงินยืมรวม (ถ้ามี):'}</label>
+      <input type="number" value="${s.creditLine||0}" onchange="editConsField('${key}','creditLine',this.value)" style="width:160px">
+      <span class="hint">บาท — ${isBank?'ยอดวงเงินที่แบงก์อนุมัติ (เช่น 70,000,000)':'ใส่ 0 ถ้าไม่มีเพดานตายตัว'}</span>
+    </div>
+    <div class="kpi">
+      <div class="box"><div class="lbl">วงเงินรวม</div><div class="val">${fmt(+s.creditLine||0)}</div><div class="cap">บาท</div></div>
+      <div class="box" style="border-left-color:var(--navy2)"><div class="lbl">เบิก/รับเข้ามาแล้วรวม</div><div class="val">${fmt(drawn)}</div><div class="cap">บาท</div></div>
+      ${(+s.creditLine||0)>0?`<div class="box" style="border-left-color:var(--gold)"><div class="lbl">วงเงินคงเหลือ (ยังเบิกได้)</div><div class="val" style="color:${creditLeft>=0?'var(--pos)':'var(--neg)'}">${fmt(creditLeft)}</div><div class="cap">วงเงิน − เบิกแล้ว</div></div>`:''}
+      <div class="box" style="border-left-color:var(--neg)"><div class="lbl">ใช้จ่ายไปแล้วรวม</div><div class="val" style="color:var(--neg)">${fmt(used)}</div><div class="cap">บาท</div></div>
+      <div class="box" style="border-left-color:var(--pos)"><div class="lbl">💰 เงินสดคงเหลือในมือ</div><div class="val" style="color:${cashInHand>=0?'var(--pos)':'var(--neg)'}">${fmt(cashInHand)}</div><div class="cap">เบิกเข้ามา − ใช้ไป</div></div>
+    </div>
+    <h3 style="font-size:15px;margin:16px 0 8px">① การเบิก / รับเงินเข้า (แต่ละงวด)</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>วันที่เบิก</th><th>ยอดที่เบิก/รับเข้า</th><th style="text-align:left">หมายเหตุ (งวดที่เท่าไหร่)</th><th></th></tr></thead>
+      <tbody>${drawRows}<tr class="total"><td>รวมเบิก</td><td>${fmt(drawn)}</td><td colspan="2"></td></tr></tbody>
+    </table></div>
+    <button class="mini primary" style="margin-top:10px" onclick="addConsDraw('${key}')">➕ เพิ่มงวดเบิก</button>
+    <h3 style="font-size:15px;margin:22px 0 8px">② การใช้เงิน (ใช้อะไรไปบ้าง)</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>วันที่</th><th style="text-align:left">รายการที่ใช้</th><th>ยอด</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
+      <tbody>${useRows}<tr class="total"><td colspan="2">รวมใช้เงิน</td><td>${fmt(used)}</td><td colspan="2"></td></tr></tbody>
+    </table></div>
+    <button class="mini primary" style="margin-top:10px" onclick="addConsUse('${key}')">➕ เพิ่มรายการใช้เงิน</button>
+  </div>`;
+}
+
 // ---- setup ----
 const SETUP_SQL=`-- ===== PLAAI: ตารางข้อมูล + ระบบความปลอดภัย (รันซ้ำได้ ข้อมูลไม่หาย) =====
 create extension if not exists pgcrypto;
@@ -743,10 +1126,8 @@ insert into plaai_users (id,name,role,pin_hash) values
  ('mgr1','ผู้จัดการโรงแรม 1 (Manager)','manager',crypt('3333',gen_salt('bf'))),
  ('mgr2','ผู้จัดการโรงแรม 2 (Manager)','manager',crypt('4444',gen_salt('bf'))),
  ('mgr3','ผู้จัดการโรงแรม 3 (Manager)','manager',crypt('5555',gen_salt('bf'))),
- ('viewer','ผู้จัดการโรงแรม 4 (Manager)','manager',crypt('6666',gen_salt('bf')))
+ ('viewer','ผู้ชม (Viewer)','viewer',crypt('6666',gen_salt('bf')))
 on conflict (id) do nothing;
--- ถ้าเคยสร้างผู้ใช้ 'viewer' เป็น role 'viewer' ไว้แล้ว ให้ปรับเป็นผู้จัดการ 4 (ดูอย่างเดียวเช่นกัน):
-update plaai_users set name='ผู้จัดการโรงแรม 4 (Manager)', role='manager' where id='viewer';
 
 -- 3) ฟังก์ชันตรวจ PIN ตอนเข้าสู่ระบบ
 create or replace function plaai_verify_login(p_user_id text, p_pin text)
@@ -763,7 +1144,7 @@ begin
   if not exists (
     select 1 from plaai_users
     where id=p_user_id and pin_hash=crypt(p_pin,pin_hash)
-      and role in ('owner','accountant')
+      and role in ('owner','accountant','manager')
   ) then
     raise exception 'unauthorized';
   end if;
@@ -800,7 +1181,7 @@ function viewSetup(){
       เปลี่ยนชื่อไฟล์เป็น <code>index.html</code> → push ขึ้น repo (แนะนำตั้ง repo เป็น <b>Private</b>) → Settings → <b>Pages</b> → Source: <b>Deploy from branch</b> → เลือก <code>main</code> / <code>root</code> → Save · ได้ลิงก์ <code>https://ชื่อคุณ.github.io/ชื่อ-repo/</code> ส่งให้ทีม<br>
       <br>ทุกคนที่เปิดลิงก์เดียวกันจะเห็นและแก้ข้อมูลชุดเดียวกันแบบเรียลไทม์ · ก่อนตั้งค่าเสร็จ ข้อมูลจะเก็บเฉพาะในเครื่องนี้
     </div>
-    <div class="callout" style="margin-top:14px">🔐 <b>ระบบล็อกอิน + สิทธิ์ผู้ใช้ (6 คน):</b> เปิดลิงก์แล้วต้องเลือกชื่อ + ใส่ PIN ก่อน · <b>เจ้าของกิจการ, ฝ่ายบัญชี</b> = แก้ไขได้ทุกตึก · <b>ผู้จัดการโรงแรม 1–4</b> = ดูอย่างเดียว และเห็นเฉพาะโรงแรมที่รับผิดชอบ (มจก.1→Prime · มจก.2→Saroj · มจก.3→Play · มจก.4→Bowin, Bowin 2, เงินก่อสร้าง — ทุกคนเห็นหน้าภาพรวม) · ทุกคนที่แก้จะซิงก์ให้เห็นตรงกันแบบเรียลไทม์<br><br>
+    <div class="callout" style="margin-top:14px">🔐 <b>ระบบล็อกอิน + สิทธิ์ผู้ใช้ (6 คน):</b> เปิดลิงก์แล้วต้องเลือกชื่อ + ใส่ PIN ก่อน · <b>เจ้าของกิจการ, ฝ่ายบัญชี, ผู้จัดการโรงแรม</b> = แก้ไขได้ทุกตึก · <b>ผู้ชม</b> = ดูได้ทุกหน้าแต่แก้ไม่ได้ · ทุกคนที่แก้จะซิงก์ให้เห็นตรงกันแบบเรียลไทม์<br><br>
     🛡️ <b>ความปลอดภัยที่เปิดใช้อยู่:</b> ① ไม่มี PIN โชว์ในซอร์สโค้ด (เก็บเป็นรหัสแฮช) · ② เมื่อรัน SQL ขั้นที่ 1 แล้ว ระบบจะตรวจ PIN + สิทธิ์ที่เซิร์ฟเวอร์ก่อน<b>บันทึกทุกครั้ง</b> — คนที่ไม่มี PIN แก้ข้อมูลไม่ได้แม้จะรู้ anon key · ③ ใส่ PIN ผิด 5 ครั้ง ระบบพัก 30 วินาที · ④ ออกจากระบบอัตโนมัติเมื่อปิดหน้าต่าง หรือไม่มีการใช้งานเกิน 30 นาที · แนะนำใช้ PIN 6 หลักขึ้นไป · ถ้าต้องการระดับสูงสุด (อีเมล+รหัสผ่าน ผ่าน Supabase Auth) แจ้งได้ค่ะ</div>
     <details><summary>🔑 เครื่องมือเปลี่ยน PIN (สร้างโค้ดสำหรับ PIN ใหม่ — ตัว PIN ไม่ถูกบันทึกที่ใด)</summary>
       <p class="hint">เลือกชื่อ → ใส่ PIN ใหม่ → กด "สร้างโค้ด" → ทำตาม 2 ขั้นที่ระบบแสดง (รัน SQL ใน Supabase + วางค่า hash ในไฟล์ แล้วอัปโหลดขึ้น GitHub ใหม่)</p>
@@ -868,6 +1249,77 @@ function delDebtItem(h,i){if(ro())return;state.hotels[h].debtItems.splice(i,1);s
 function editField(path,val){if(ro())return;setPath(state,path,val);save();render();}
 function addItem(path,item){if(ro())return;let o=state;path.forEach(p=>o=o[p]);o.push(item);save();render();}
 function delItem(path,i){if(ro())return;let o=state;path.forEach(p=>o=o[p]);o.splice(i,1);save();render();}
+
+// ---- จ่ายเงินสด (เชค operation + financing) ----
+function editPay(kind,i,field,val){ if(ro())return; const p=state.payments[kind][i]; if(!p)return; if(field==='amount') p.amount=numParse(val); else p[field]=val; save(); render(); }
+function addPay(kind){ if(ro())return; const idKey=kind==='operation'?'cheqNo':'ref'; const o={id:kind[0]+Date.now()}; o[idKey]=''; o.hotel=''; o.item=''; o.amount=0; o.date=''; state.payments[kind].push(o); save(); render(); }
+function delPay(kind,i){ if(ro())return; state.payments[kind].splice(i,1); save(); render(); }
+async function importPay(kind,inp){ if(ro()){inp.value='';return;} const f=inp.files[0]; if(!f)return;
+  const name=f.name.toLowerCase();
+  try{
+    let aoa;
+    if(name.endsWith('.csv')||name.endsWith('.txt')){ aoa=parseCSV(await f.text()); }
+    else { await ensureXLSX(); const wb=XLSX.read(await f.arrayBuffer(),{type:'array'}); aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''}); }
+    aoa=(aoa||[]).filter(r=>r&&r.some(x=>(''+x).trim()!==''));
+    if(aoa.length<2){ toast('ไฟล์ว่างหรือไม่มีข้อมูล'); inp.value=''; return; }
+    const hdr=aoa[0].map(x=>(''+x).trim().toLowerCase());
+    const idKey=kind==='operation'?'cheqNo':'ref';
+    const cId=colIndex(hdr,kind==='operation'?['เช็ค','เชค','cheque','cheq','เลขที่']:['อ้างอิง','ref','เลขที่']);
+    const cHotel=colIndex(hdr,['โรงแรม','hotel','ตึก','สาขา']);
+    const cItem=colIndex(hdr,['รายการ','item','detail','คำอธิบาย','description']);
+    const cAmt=colIndex(hdr,['ยอด','amount','จำนวน','บาท']);
+    const cDate=colIndex(hdr,['วันที่','date','กำหนด']);
+    let added=0,updated=0,skipped=0; const list=state.payments[kind];
+    for(let r=1;r<aoa.length;r++){ const row=aoa[r];
+      const idv=cId>=0?(''+row[cId]).trim():'';
+      const hotelName=cHotel>=0?(''+row[cHotel]).trim():'';
+      const item=cItem>=0?(''+row[cItem]).trim():'';
+      const amount=cAmt>=0?numParse(row[cAmt]):0;
+      const date=cDate>=0?normDate(row[cDate]):'';
+      if(!amount && !item && !idv){ skipped++; continue; }
+      const hk=hotelKeyFromName(hotelName)||hotelName;
+      let ex=idv? list.find(p=>((''+(p[idKey]||'')).trim()===idv)) : null;
+      if(ex){ ex.hotel=hk||ex.hotel; ex.item=item||ex.item; ex.amount=amount; if(date)ex.date=date; updated++; }
+      else { const o={id:kind[0]+Date.now()+'_'+r}; o[idKey]=idv; o.hotel=hk; o.item=item; o.amount=amount; o.date=date; list.push(o); added++; }
+    }
+    save(); render(); toast(`นำเข้าสำเร็จ — เพิ่ม ${added} · อัปเดต(เลขซ้ำ) ${updated}${skipped?' · ข้าม '+skipped:''}`);
+  }catch(e){ console.error(e); toast('นำเข้าไม่สำเร็จ: '+(e.message||e)); }
+  inp.value='';
+}
+async function exportPay(kind,ext){ const idKey=kind==='operation'?'cheqNo':'ref'; const idLabel=kind==='operation'?'เลขที่เช็ค':'เลขที่อ้างอิง';
+  const aoa=[[idLabel,'โรงแรม','รายการจ่าย','ยอดจ่าย','วันที่จ่าย','สถานะ']];
+  (state.payments[kind]||[]).forEach(p=>{ const hk=hotelKeyFromName(p.hotel); const hn=hk?state.hotels[hk].name:(p.hotel||'');
+    aoa.push([p[idKey]||'',hn,p.item||'',(+p.amount||0),p.date||'',p.date?(paymentDue(p)?'ตัดแล้ว':'รอตัด'):'ไม่มีวันที่']); });
+  const base=(kind==='operation'?'operation_cheques':'financing')+'_'+todayStr();
+  try{ if(ext==='xlsx'){ await ensureXLSX(); const ws=XLSX.utils.aoa_to_sheet(aoa); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,kind); XLSX.writeFile(wb,base+'.xlsx'); }
+    else downloadCSV(aoa,base+'.csv'); toast('ส่งออกไฟล์แล้ว'); }
+  catch(e){ console.error(e); toast('ส่งออกไม่สำเร็จ: '+(e.message||e)); }
+}
+function downloadTemplate(kind){ const idLabel=kind==='operation'?'เลขที่เช็ค':'เลขที่อ้างอิง';
+  const aoa=[[idLabel,'โรงแรม','รายการจ่าย','ยอดจ่าย','วันที่จ่าย'],
+    kind==='operation'?['CHQ-0001','บ่อวิน','ค่าวัสดุก่อสร้าง',150000,'2026-07-20']:['FIN-0001','Prime','ผ่อนแบงก์กรุงเทพ',1000000,'2026-07-25']];
+  downloadCSV(aoa,(kind==='operation'?'template_operation_cheque':'template_financing')+'.csv'); }
+
+// ---- สัญญาเงินกู้ + โน้ต (หน้าแผนปิดหนี้บริษัท) ----
+function editLoan(i,field,val){ if(ro())return; const l=state.loans[i]; if(!l)return; if(['limit','balance','monthly'].includes(field)) l[field]=numParse(val); else if(field==='rate') l.rate=(numParse(val)||0)/100; else l[field]=val; save(); render(); }
+function addLoan(){ if(ro())return; state.loans.push({id:'L'+Date.now(),hotel:'',bank:'',type:'เงินกู้',limit:0,balance:0,rate:0.0635,monthly:0,note:''}); save(); render(); }
+function delLoan(i){ if(ro())return; if(!confirm('ลบสัญญาเงินกู้นี้?'))return; state.loans.splice(i,1); save(); render(); }
+function editLoanNote(i,val){ if(ro())return; state.loanNotes[i]=val; save(); }
+function addLoanNote(){ if(ro())return; state.loanNotes.push(''); save(); render(); }
+function delLoanNote(i){ if(ro())return; state.loanNotes.splice(i,1); save(); render(); }
+function editLoanAsOf(val){ if(ro())return; state.loanAsOf=val||LOAN_ASOF; save(); render(); }
+function setFinanceRange(m){ financeRange=+m; render(); }
+
+// ---- เงินก่อสร้าง (รายละเอียด 3 แหล่ง) ----
+function setConsSub(s){ consSub=s; render(); window.scrollTo(0,0); }
+function editConsField(key,field,val){ if(ro())return; state.consDetail[key][field]=(field==='creditLine')?numParse(val):val; save(); render(); }
+function addConsDraw(key){ if(ro())return; state.consDetail[key].draws.push({id:'dr'+Date.now(),date:'',amount:0,note:''}); save(); render(); }
+function editConsDraw(key,i,field,val){ if(ro())return; const d=state.consDetail[key].draws[i]; if(!d)return; d[field]=(field==='amount')?numParse(val):val; save(); render(); }
+function delConsDraw(key,i){ if(ro())return; state.consDetail[key].draws.splice(i,1); save(); render(); }
+function addConsUse(key){ if(ro())return; state.consDetail[key].uses.push({id:'us'+Date.now(),date:'',item:'',amount:0,note:''}); save(); render(); }
+function editConsUse(key,i,field,val){ if(ro())return; const u=state.consDetail[key].uses[i]; if(!u)return; u[field]=(field==='amount')?numParse(val):val; save(); render(); }
+function delConsUse(key,i){ if(ro())return; state.consDetail[key].uses.splice(i,1); save(); render(); }
+
 function exportJSON(){const b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='plaai_hotel_data.json';a.click();}
 function importJSON(inp){if(ro())return;const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{state=JSON.parse(e.target.result);migrate();save();render();toast('นำเข้าข้อมูลแล้ว');}catch(err){toast('ไฟล์ไม่ถูกต้อง');}};r.readAsText(f);}
 function resetAll(){if(ro())return;if(confirm('รีเซ็ตกลับค่าตั้งต้นทั้งหมด?')){state=JSON.parse(JSON.stringify(SEED));migrate();save();render();}}
@@ -897,6 +1349,20 @@ function drawCharts(){
       charts.s=new Chart(srcPie,{type:'doughnut',data:{labels:c.sources.map(s=>s.name),datasets:[{data:srcData,backgroundColor:['#243f66','#c0392b','#1b7a4b']}]},options:pieOpt('แหล่งเงิน')});
     if(document.getElementById('usePie')&&useData.some(x=>x>0))
       charts.u=new Chart(usePie,{type:'doughnut',data:{labels:c.uses.map(u=>u.name),datasets:[{data:useData,backgroundColor:['#b28e4c','#7c3aed','#0891b2','#64748b','#db2777','#65a30d']}]},options:pieOpt('การใช้เงิน')});
+  }
+  if(currentTab==='financing'){
+    const rows=loanSchedule(financeRange);
+    const labels=rows.map(r=>ymTh(r.date));
+    const hs=HOTEL_ORDER.filter(h=>rows.some(r=>(r.balHotel[h]||0)>0||(r.payHotel[h]||0)>0));
+    if(document.getElementById('finPayChart')){
+      const ds=hs.map(h=>({label:state.hotels[h].name,data:rows.map(r=>r.payHotel[h]||0),backgroundColor:state.hotels[h].color,stack:'pay'}));
+      ds.push({label:'ยอดหนี้คงเหลือรวม',data:rows.map(r=>r.total_bal),type:'line',borderColor:'#0f2545',borderDash:[5,4],borderWidth:2,pointRadius:0,yAxisID:'y1'});
+      charts.fp=new Chart(finPayChart,{type:'bar',data:{labels,datasets:ds},options:{interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:10}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},scales:{x:{stacked:true,ticks:{maxRotation:60,minRotation:60,autoSkip:true,maxTicksLimit:16}},y:{stacked:true,ticks:{callback:v=>fmt(v)}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmt(v)}}}}});
+    }
+    if(document.getElementById('finBalChart')){
+      const ds=hs.map(h=>({label:state.hotels[h].name,data:rows.map(r=>r.balHotel[h]||0),borderColor:state.hotels[h].color,backgroundColor:'transparent',tension:.2,pointRadius:0}));
+      charts.fb=new Chart(finBalChart,{type:'line',data:{labels,datasets:ds},options:{interaction:{mode:'index',intersect:false},plugins:{legend:{position:'top',labels:{boxWidth:12,font:{size:10}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(c.parsed.y)}}},scales:{x:{ticks:{maxRotation:60,minRotation:60,autoSkip:true,maxTicksLimit:16}},y:{ticks:{callback:v=>fmt(v)}}}}});
+    }
   }
   if(currentTab==='combined'){
     const yr=currentYear['_combined']||'2026';
@@ -1130,7 +1596,6 @@ function applyPerms(){
 let appStarted=false;
 function startApp(){
   if(!appStarted){ appStarted=true; connectData(); }
-  if(!canSeeTab(currentTab)){ const a=allowedTabs(); currentTab=(a&&a[0])||'combined'; }
   buildNav(); render(); renderAsOf(); renderUser();
 }
 
