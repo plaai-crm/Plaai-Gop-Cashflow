@@ -363,6 +363,14 @@ function migrate(){
   if(!state.payments) state.payments={operation:[],financing:[]};
   if(!Array.isArray(state.payments.operation)) state.payments.operation=[];
   if(!Array.isArray(state.payments.financing)) state.payments.financing=[];
+  // เติมฟิลด์ใหม่ให้รายการจ่ายเดิม: id (สำหรับปุ่มจัดการ), dueDate (กำหนดชำระ), status (''=อัตโนมัติ | 'hold'=เลื่อนจ่าย | 'paid'=ยืนยันจ่ายแล้ว)
+  ['operation','financing'].forEach(kind=>{
+    state.payments[kind].forEach((p,i)=>{
+      if(!p.id) p.id=kind[0]+'_'+(p.date||'')+'_'+i+'_'+Math.random().toString(36).slice(2,7);
+      if(p.dueDate===undefined) p.dueDate='';       // กำหนดชำระ (เดดไลน์ที่คู่ค้าให้มา)
+      if(p.status===undefined) p.status='';          // สถานะการจัดการ (ค่าว่าง = ตัดเงินอัตโนมัติเมื่อถึงวันจ่าย)
+    });
+  });
   // ---- โมดูลใหม่: สัญญาเงินกู้ + โน้ตกลยุทธ์ (หน้าแผนปิดหนี้บริษัท) ----
   if(!Array.isArray(state.loans)||!state.loans.length) state.loans=JSON.parse(JSON.stringify(LOAN_SEED));
   if(!Array.isArray(state.loanNotes)) state.loanNotes=JSON.parse(JSON.stringify(NOTES_SEED));
@@ -475,22 +483,44 @@ function cashNowVal(h){
 // ---------- ตัดเงินสดอัตโนมัติ: รายการจ่าย (เชค operation + financing) ที่ถึงกำหนดจ่ายแล้ว ----------
 function ymdToNum(d){ if(!d) return 0; const p=(''+d).split('-'); return (+p[0]||0)*10000+(+p[1]||0)*100+(+p[2]||0); }
 function paymentDue(p){ const a=effAsOf(); return p.date && ymdToNum(p.date)<=ymdToNum(a.ymd); }
+// ---- ตรรกะสถานะจ่าย (รองรับการ "เลื่อนจ่าย" เมื่อเงินสดไม่พอ) ----
+// isPaidBy: รายการนี้ถูก "ตัดเงินสดแล้ว" ณ วันที่ ymd หรือไม่
+//   status==='paid' → ยืนยันจ่ายแล้ว (ตัดเสมอ) · status==='hold' → เลื่อนจ่าย (ไม่ตัด แม้ถึงวันจ่าย) · ค่าว่าง → ตัดอัตโนมัติเมื่อถึง "วันที่จะจ่าย"
+function isPaidBy(p,ymd){ if(!p||p.void) return false; if(p.status==='paid') return true; if(p.status==='hold') return false;
+  return !!p.date && ymdToNum(p.date)<=ymdToNum(ymd); }
+function isPaid(p){ return isPaidBy(p,effAsOf().ymd); }
+// เลยกำหนดชำระแล้วแต่ยังไม่ได้จ่าย (ใช้แจ้งเตือน) — มี "กำหนดชำระ" และเลยวันนั้นแล้ว และยังไม่ถูกตัดเงิน
+function isOverdueUnpaid(p){ if(!p||p.void) return false; if(isPaid(p)) return false;
+  return !!p.dueDate && ymdToNum(p.dueDate)<ymdToNum(effAsOf().ymd); }
+// วันครบกำหนด/วันที่ใช้จัดกลุ่มช่วง (fallback ไป dueDate ถ้าไม่มีวันจ่าย)
+function payWhen(p){ return p.date || p.dueDate || ''; }
 function allPayments(){ return (state.payments&&state.payments.operation||[]).map(p=>Object.assign({_kind:'operation'},p))
   .concat((state.payments&&state.payments.financing||[]).map(p=>Object.assign({_kind:'financing'},p))); }
-// เงินที่ "ถึงกำหนดจ่ายแล้ว" ของตึกนี้ (จะถูกตัดจาก cash on hand); kind='all'|'operation'|'financing'
+// เงินที่ "ตัดจากเงินสดแล้ว" ของตึกนี้ (จ่ายอัตโนมัติเมื่อถึงวันจ่าย + รายการที่ยืนยันจ่าย — ไม่รวมที่เลื่อนจ่าย); kind='all'|'operation'|'financing'
 function dueDeductions(h,kind){
   let sum=0;
-  const scan=(list)=>{ (list||[]).forEach(p=>{ if(p.void) return; if(hotelKeyFromName(p.hotel)!==h) return; if(paymentDue(p)) sum+=(+p.amount||0); }); };
+  const scan=(list)=>{ (list||[]).forEach(p=>{ if(hotelKeyFromName(p.hotel)!==h) return; if(isPaid(p)) sum+=(+p.amount||0); }); };
   if(!kind||kind==='all'||kind==='operation') scan(state.payments&&state.payments.operation);
   if(!kind||kind==='all'||kind==='financing') scan(state.payments&&state.payments.financing);
   return sum;
 }
-// รายการที่ยังไม่ถึงกำหนด (จะตัดในอนาคต) ของตึกนี้
+// รายการที่ยังไม่ถูกตัด (รอจ่าย/เลื่อนจ่าย/เลยกำหนด) ของตึกนี้
 function pendingDeductions(h){
   let sum=0;
-  allPayments().forEach(p=>{ if(p.void) return; if(hotelKeyFromName(p.hotel)!==h) return; if(!paymentDue(p)) sum+=(+p.amount||0); });
+  allPayments().forEach(p=>{ if(p.void) return; if(hotelKeyFromName(p.hotel)!==h) return; if(!isPaid(p)) sum+=(+p.amount||0); });
   return sum;
 }
+// รายการเลยกำหนดชำระแต่ยังไม่จ่าย (เจาะจงตึก หรือ scope=array ของคีย์ตึก · ไม่ใส่ = ทุกตึก) — เรียงจากเลยกำหนดมานานสุด
+function overduePayments(scope){
+  const inScope=h=>!scope || (Array.isArray(scope)&&scope.includes(h));
+  const out=[];
+  allPayments().forEach(p=>{ if(!isOverdueUnpaid(p)) return; const hk=hotelKeyFromName(p.hotel); if(!inScope(hk)) return;
+    out.push(Object.assign({_hk:hk},p)); });
+  out.sort((a,b)=>ymdToNum(a.dueDate)-ymdToNum(b.dueDate));
+  return out;
+}
+function daysOverdue(p){ const a=effAsOf(); const toD=s=>{const q=(''+s).split('-');return new Date(+q[0],(+q[1]||1)-1,+q[2]||1);};
+  return Math.round((toD(a.ymd)-toD(p.dueDate))/86400000); }
 // เงินสดพร้อมใช้ = เงินสดตั้งต้นที่กรอก − รายการที่ถึงกำหนดจ่ายแล้ว
 function effectiveCashNow(h){ const cn=cashNowVal(h); if(cn===null) return null; return cn - dueDeductions(h); }
 function anchorInfo(h){
@@ -728,7 +758,7 @@ function viewHotel(h){
    </div>`).join('');
   const uc = hotel.underConstruction? `<span class="pill" style="background:#ede9fe;color:#6d28d9">กำลังก่อสร้าง · เปิด ~${hotel.openMonth}</span>`:'';
   const cashPanel = cashPanelHTML(Object.assign(cashPosition(h,yr),{yr,scope:''}));
-  return `<div class="card">
+  return `${overdueAlertHTML([h],true)}<div class="card">
     <h2>${hotel.name} ${uc}</h2>
     <div class="yrtabs">${yrbtns}</div>
     <div class="growthbox">${growthUI}</div>
@@ -812,7 +842,7 @@ function viewCombined(){
   const yrbtns=fy.map(y=>`<button class="${y===yr?'active':''}" onclick="setYear('_combined','${y}');render();">${y}</button>`).join('')
     + `<button onclick="addYear('_combined')" title="เพิ่มปีประมาณการถัดไป" style="background:var(--gold-soft);border-color:var(--gold);color:var(--forecast-ink)">+ เพิ่มปี</button>`
     + (fy.length>1?`<button onclick="delYear('${maxY}','_combined')" title="ลบปี ${maxY}" style="background:#fbe4e0;border-color:#f3c9c2;color:#a13223">− ลบปี ${maxY}</button>`:'');
-  return `<div class="card">
+  return `${overdueAlertHTML(myHotelScope(),true)}<div class="card">
     <h2>📊 ภาพรวมกระแสเงินสดรวมทุกตึก</h2>
     <p class="hint">สรุปทั้งเครือในหน้าเดียว — เงินสดสุทธิ = GOP − ชำระหนี้ − ค่าใช้จ่ายหลัง GOP · สีเขียว = เหลือ · สีแดง = ขาด</p>
     <div class="yrtabs">${yrbtns}</div>
@@ -876,22 +906,54 @@ let cashViewFrom='', cashViewTo='';
 function setCashRange(which,val){ if(which==='from') cashViewFrom=val; else cashViewTo=val; render(); }
 function clearCashRange(){ cashViewFrom=''; cashViewTo=''; render(); }
 function cashRangeTo(){ return cashViewTo || effAsOf().ymd; }
-function payInRange(p){ if(!p.date) return false; const n=ymdToNum(p.date);
+function payInRange(p){ const d=payWhen(p); if(!d) return false; const n=ymdToNum(d);
   if(cashViewFrom && n<ymdToNum(cashViewFrom)) return false;
   if(cashViewTo && n>ymdToNum(cashViewTo)) return false; return true; }
-// ตัดแล้วในช่วงที่เลือก (ถ้าไม่เลือก = ทุกรายการที่ถึงกำหนด ณ วันที่มุมขวาบน)
-function dueInRange(h){ let sum=0; allPayments().forEach(p=>{ if(p.void)return;
-  if(hotelKeyFromName(p.hotel)!==h)return;
-  if(cashViewFrom||cashViewTo){ if(payInRange(p)) sum+=(+p.amount||0); }
-  else { if(paymentDue(p)) sum+=(+p.amount||0); } }); return sum; }
-// จ่ายสะสมถึงวันสิ้นสุดช่วง (ใช้คำนวณ "พร้อมใช้")
-function dueUpToRange(h){ const to=cashRangeTo(); let sum=0; allPayments().forEach(p=>{ if(p.void)return;
-  if(hotelKeyFromName(p.hotel)!==h)return;
-  if(p.date && ymdToNum(p.date)<=ymdToNum(to)) sum+=(+p.amount||0); }); return sum; }
-// รอตัด: รายการหลังวันสิ้นสุดช่วง
+// ตัดแล้วในช่วงที่เลือก (ถ้าไม่เลือก = ทุกรายการที่ตัดเงินแล้ว ณ วันที่มุมขวาบน · ไม่รวมรายการที่เลื่อนจ่าย)
+function dueInRange(h){ let sum=0; allPayments().forEach(p=>{ if(hotelKeyFromName(p.hotel)!==h)return;
+  if(cashViewFrom||cashViewTo){ if(payInRange(p)&&isPaid(p)) sum+=(+p.amount||0); }
+  else { if(isPaid(p)) sum+=(+p.amount||0); } }); return sum; }
+// จ่ายสะสมถึงวันสิ้นสุดช่วง (ใช้คำนวณ "พร้อมใช้") — เฉพาะที่ถูกตัดเงินจริง
+function dueUpToRange(h){ const to=cashRangeTo(); let sum=0; allPayments().forEach(p=>{ if(hotelKeyFromName(p.hotel)!==h)return;
+  if(isPaidBy(p,to)) sum+=(+p.amount||0); }); return sum; }
+// รอตัด: รายการที่ยังไม่ถูกตัด ณ วันสิ้นสุดช่วง (รวมที่เลื่อนจ่าย/เลยกำหนด)
 function pendingAfterRange(h){ const to=cashRangeTo(); let sum=0; allPayments().forEach(p=>{ if(p.void)return;
   if(hotelKeyFromName(p.hotel)!==h)return;
-  if(p.date && ymdToNum(p.date)>ymdToNum(to)) sum+=(+p.amount||0); }); return sum; }
+  if(!isPaidBy(p,to)) sum+=(+p.amount||0); }); return sum; }
+// ---- ตึกที่ผู้ใช้ปัจจุบันดูแล (owner/บัญชี = ทุกตึก → null · ผู้จัดการ = เฉพาะตึกใน tabs) ----
+function myHotelScope(){ if(canEdit) return null; const a=allowedTabs(); if(!a) return null; return a.filter(t=>state.hotels&&state.hotels[t]); }
+// ---- แถบแจ้งเตือน "เลยกำหนดชำระแต่ยังไม่ได้จ่าย" · scope=array คีย์ตึก หรือ null=ทุกตึก · manage=true ให้ปุ่มจัดการ (เฉพาะ owner/บัญชี) ----
+function overdueAlertHTML(scope,manage){
+  const list=overduePayments(scope);
+  if(!list.length) return '';
+  const total=list.reduce((s,p)=>s+(+p.amount||0),0);
+  const canManage=manage && canEdit;
+  const rows=list.map(p=>{
+    const hk=p._hk; const hn=hk?state.hotels[hk].name:(p.hotel||'ไม่ระบุตึก');
+    const idKey=p._kind==='operation'?'cheqNo':'ref';
+    const held=p.status==='hold';
+    const actions=canManage?`<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+        ${held?'':`<button class="mini" style="background:#fdecea;color:#8a2a1c;padding:6px 10px" onclick="setPayStatusById('${p._kind}','${p.id}','hold')" title="เลื่อนจ่าย — เงินไม่พอ ยังไม่ตัดเงินสด">⏸️ เลื่อนจ่าย</button>`}
+        <button class="mini" style="background:#e7f6ee;color:#12603a;padding:6px 10px" onclick="setPayStatusById('${p._kind}','${p.id}','paid')" title="จ่ายแล้ว — ตัดเงินสดทันที">✅ จ่ายแล้ว</button>
+      </div>`:'';
+    return `<tr>
+      <td style="text-align:left">${hn}</td>
+      <td style="text-align:left">${(p.item||'-')}${p[idKey]?` <span class="pill" style="font-size:11px">${p[idKey]}</span>`:''}${held?' <span class="pill" style="background:#fde2dc;color:#8a2a1c;font-size:11px">เลื่อนจ่าย</span>':''}</td>
+      <td class="neg"><b>${fmt0(+p.amount||0)}</b></td>
+      <td>${p.dueDate?thaiDate(p.dueDate):'-'}</td>
+      <td style="color:#8a2a1c">เลย ${daysOverdue(p)} วัน</td>
+      ${canManage?`<td>${actions}</td>`:''}
+    </tr>`;
+  }).join('');
+  return `<div class="card" style="border:2px solid #f3c9c2;background:#fdecea">
+    <h2 style="color:#8a2a1c">⚠️ เลยกำหนดชำระแล้วแต่ยังไม่ได้จ่าย — ${list.length} รายการ · รวม ${fmt0(total)} บาท</h2>
+    <p class="hint" style="color:#8a2a1c">${canManage?'ยอดเหล่านี้ถึงกำหนดชำระแล้วแต่ยังไม่ถูกตัดเงินสด — กด "⏸️ เลื่อนจ่าย" ถ้าต้องดึงการจ่ายออกไป (เงินไม่พอ) หรือ "✅ จ่ายแล้ว" เพื่อตัดเงินสดทันที':'ยอดของตึกที่คุณดูแลที่เลยกำหนดชำระแล้วแต่ยังไม่จ่าย — แจ้งฝ่ายบัญชี/เจ้าของกิจการเพื่อจัดการ (บัญชีนี้ดูอย่างเดียว)'}</p>
+    <div class="tblwrap"><table>
+      <thead><tr><th style="text-align:left">โรงแรม</th><th style="text-align:left">รายการ</th><th>ยอด</th><th>กำหนดชำระ</th><th>สถานะ</th>${canManage?'<th></th>':''}</tr></thead>
+      <tbody>${rows}<tr class="total"><td colspan="2">รวม ${list.length} รายการ</td><td class="neg">${fmt0(total)}</td><td colspan="${canManage?3:2}"></td></tr></tbody>
+    </table></div>
+  </div>`;
+}
 function paySummaryRows(){
   return HOTEL_ORDER.map(h=>{
     const cn=cashNowVal(h);
@@ -903,37 +965,55 @@ function paySummaryRows(){
       <td style="color:#9a6b00">${pend?fmt0(pend):'0'}</td></tr>`;
   }).join('');
 }
+// ป้ายสถานะจ่าย (auto): จ่ายแล้ว / เลยกำหนดชำระ / เลื่อนจ่าย / รอจ่าย
+function payStatusBadge(p){
+  if(p.void) return '<span class="pill">🚫 ยกเลิก</span>';
+  if(isPaid(p)){ const t=(p.status==='paid'&&!(p.date&&paymentDue(p)))?'✅ ยืนยันจ่ายแล้ว':'✅ จ่ายแล้ว (ตัดเงินแล้ว)';
+    return `<span class="pill" style="background:#e7f6ee;color:#12603a">${t}</span>`; }
+  const overdue = p.dueDate && ymdToNum(p.dueDate)<ymdToNum(effAsOf().ymd);
+  if(p.status==='hold') return `<span class="pill" style="background:#fdecea;color:#8a2a1c">⏸️ เลื่อนจ่าย${overdue?' · ⚠️ เลยกำหนด '+daysOverdue(p)+' วัน':''}</span>`;
+  if(overdue) return `<span class="pill" style="background:#fdecea;color:#8a2a1c">⚠️ เลยกำหนดชำระ ${daysOverdue(p)} วัน</span>`;
+  return '<span class="pill" style="background:#fff3da;color:#9a6b00">⏳ รอจ่าย</span>';
+}
+function payStatusSelect(kind,i,p){
+  const opt=(v,label)=>`<option value="${v}" ${(p.status||'')===v?'selected':''}>${label}</option>`;
+  return `<select style="font-size:12.5px;padding:6px 4px;border-radius:7px;border:1px solid var(--line)" onchange="editPay('${kind}',${i},'status',this.value)">
+    ${opt('','⚙️ อัตโนมัติ')}${opt('hold','⏸️ เลื่อนจ่าย')}${opt('paid','✅ จ่ายแล้ว')}</select>`;
+}
 function payTable(kind){
   const list=state.payments[kind]||[];
   const idKey=kind==='operation'?'cheqNo':'ref';
   const idLabel=kind==='operation'?'เลขที่เชค':'เลขที่อ้างอิง';
-  const dateLabel=kind==='operation'?'วันที่จ่าย':'วันที่ตัดเงิน';
+  const dateLabel=kind==='operation'?'วันที่จะจ่าย':'วันที่ตัดเงิน';
   let body;
-  if(!list.length) body=`<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">ยังไม่มีรายการ — กด "➕ เพิ่มแถว" หรือ "⬆️ นำเข้าไฟล์"</td></tr>`;
+  if(!list.length) body=`<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:16px">ยังไม่มีรายการ — กด "➕ เพิ่มแถว" หรือ "⬆️ นำเข้าไฟล์"</td></tr>`;
   else body=list.map((p,i)=>{
-    const due=p.date?paymentDue(p):null; const hk=hotelKeyFromName(p.hotel);
-    return `<tr>
-      <td style="text-align:left"><input class="cell" style="width:120px;text-align:left" value="${(''+(p[idKey]||'')).replace(/"/g,'&quot;')}" onchange="editPay('${kind}',${i},'${idKey}',this.value)"></td>
+    const hk=hotelKeyFromName(p.hotel);
+    const overdue=isOverdueUnpaid(p);
+    return `<tr${overdue?' style="background:#fff6f4"':''}>
+      <td style="text-align:left"><input class="cell" style="width:110px;text-align:left" value="${(''+(p[idKey]||'')).replace(/"/g,'&quot;')}" onchange="editPay('${kind}',${i},'${idKey}',this.value)"></td>
       <td style="text-align:left"><select onchange="editPay('${kind}',${i},'hotel',this.value)"><option value="">— เลือกตึก —</option>${hotelOpts(hk)}</select></td>
-      <td style="text-align:left"><input class="cell" style="width:200px;text-align:left" value="${(p.item||'').replace(/"/g,'&quot;')}" onchange="editPay('${kind}',${i},'item',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:180px;text-align:left" value="${(p.item||'').replace(/"/g,'&quot;')}" onchange="editPay('${kind}',${i},'item',this.value)"></td>
       <td><input class="cell" value="${p.amount||0}" onchange="editPay('${kind}',${i},'amount',this.value)"></td>
-      <td><input class="cell" type="date" style="width:150px" value="${p.date||''}" onchange="editPay('${kind}',${i},'date',this.value)"></td>
-      <td>${p.date?(due?'<span class="pill" style="background:#fdecea;color:#8a2a1c">✓ ตัดแล้ว</span>':'<span class="pill" style="background:#fff3da;color:#9a6b00">⏳ รอตัด</span>'):'<span class="pill">—</span>'}</td>
+      <td><input class="cell" type="date" style="width:140px" value="${p.dueDate||''}" onchange="editPay('${kind}',${i},'dueDate',this.value)" title="วันครบกำหนดชำระที่คู่ค้ากำหนด"></td>
+      <td><input class="cell" type="date" style="width:140px" value="${p.date||''}" onchange="editPay('${kind}',${i},'date',this.value)" title="วันที่จะจ่ายจริง — เมื่อถึงวันนี้ระบบตัดเงินสดอัตโนมัติ"></td>
+      <td>${payStatusSelect(kind,i,p)}</td>
+      <td>${payStatusBadge(p)}</td>
       <td><button class="mini danger" onclick="delPay('${kind}',${i})">ลบ</button></td>
     </tr>`;
   }).join('');
   const total=list.reduce((s,p)=>s+(+p.amount||0),0);
   return `<div class="tblwrap"><table>
-    <thead><tr><th style="text-align:left">${idLabel}</th><th style="text-align:left">โรงแรม</th><th style="text-align:left">รายการจ่าย</th><th>ยอดจ่าย</th><th>${dateLabel}</th><th>สถานะ</th><th></th></tr></thead>
-    <tbody>${body}<tr class="total"><td colspan="3">รวม ${list.length} รายการ</td><td>${fmt0(total)}</td><td colspan="3"></td></tr></tbody>
+    <thead><tr><th style="text-align:left">${idLabel}</th><th style="text-align:left">โรงแรม</th><th style="text-align:left">รายการจ่าย</th><th>ยอดจ่าย</th><th>กำหนดชำระ</th><th>${dateLabel}</th><th>จัดการเช็ค</th><th>สถานะ</th><th></th></tr></thead>
+    <tbody>${body}<tr class="total"><td colspan="3">รวม ${list.length} รายการ</td><td>${fmt0(total)}</td><td colspan="5"></td></tr></tbody>
   </table></div>`;
 }
 function viewCash(){
   const a=effAsOf();
-  return `<div class="card">
+  return `${overdueAlertHTML(null,true)}<div class="card">
     <h2>💵 เงินสด &amp; จ่ายเช็ค — บันทึกจ่ายเงินสดจริง</h2>
-    <p class="hint">แยกเงินจ่ายจริงเป็น 2 ฝั่ง: <b>Operation</b> (จ่ายเป็นเช็ค มีเลขที่เช็ค) และ <b>Financing</b> (ตัดบัญชีอัตโนมัติ) · เมื่อถึง "วันจ่าย" ของแต่ละรายการ (เทียบกับวันที่ ${thaiDate(a.ymd)} มุมขวาบน) ระบบจะ<b>ตัดเงิน Cash on hand ให้อัตโนมัติ</b> · นำเข้าไฟล์ Excel/CSV ได้ ระบบจับคู่ด้วย<b>เลขที่เช็ค</b>เพื่อกันรายการซ้ำ</p>
-    <div class="callout">🧮 <b>วิธีคิด:</b> เงินสดพร้อมใช้ = เงินสดตั้งต้นที่กรอกในหน้าแต่ละตึก − ผลรวมรายการที่ "ถึงกำหนดจ่ายแล้ว" · รายการที่ยังไม่ถึงวันจ่ายจะยังไม่ถูกตัด (โชว์เป็น "รอตัด") · แก้วันที่ = ย้อนกลับได้ ไม่มีการลบยอดถาวร</div>
+    <p class="hint">แยกเงินจ่ายจริงเป็น 2 ฝั่ง: <b>Operation</b> (จ่ายเป็นเช็ค มีเลขที่เช็ค) และ <b>Financing</b> (ตัดบัญชีอัตโนมัติ) · เมื่อถึง "วันที่จะจ่าย" ของแต่ละรายการ (เทียบกับวันที่ ${thaiDate(a.ymd)} มุมขวาบน) ระบบจะ<b>ตัดเงิน Cash on hand ให้อัตโนมัติ</b> · นำเข้าไฟล์ Excel/CSV ได้ ระบบจับคู่ด้วย<b>เลขที่เช็ค</b>เพื่อกันรายการซ้ำ</p>
+    <div class="callout">🧮 <b>วิธีคิด:</b> เงินสดพร้อมใช้ = เงินสดตั้งต้น − รายการที่ตัดเงินแล้ว · <b>กำหนดชำระ</b> = เดดไลน์ที่ต้องจ่าย · <b>วันที่จะจ่าย</b> = วันที่จะตัดเงินจริง (เลื่อนออกไปได้เมื่อเงินไม่พอ) · ช่อง <b>จัดการเช็ค</b> เลือก "⏸️ เลื่อนจ่าย" เพื่อดึงการจ่ายออกไป (ไม่ตัดเงินแม้ถึงวันจ่าย) หรือ "✅ จ่ายแล้ว" เพื่อตัดเงินทันที · ยอดที่เลยกำหนดชำระแต่ยังไม่จ่ายจะขึ้น<b style="color:#8a2a1c">แถบแจ้งเตือนสีแดง</b>ด้านบน</div>
     <div class="growthbox" style="background:#eef4fb;border-color:#cfe0f2">
       <label>📅 ดูข้อมูลจากวันที่:</label>
       <input type="date" value="${cashViewFrom}" onchange="setCashRange('from',this.value)" style="width:150px">
@@ -974,7 +1054,7 @@ function viewCash(){
       <button class="mini" onclick="downloadTemplate('financing')">📄 ดาวน์โหลดเทมเพลต</button>
     </div>
     ${payTable('financing')}
-    <p class="legend" style="margin-top:12px">รูปแบบไฟล์นำเข้า: หัวคอลัมน์ควรมีคำว่า <code>เลขที่เช็ค/อ้างอิง</code>, <code>โรงแรม</code>, <code>รายการ</code>, <code>ยอด</code>, <code>วันที่</code> (ภาษาไทยหรืออังกฤษก็ได้) · วันที่รับได้ทั้ง 2026-07-20, 20/07/2026 หรือปี พ.ศ. · ระบบจับคู่เลขที่เช็คซ้ำให้อัตโนมัติ (อัปเดตทับ ไม่เพิ่มซ้ำ)</p>
+    <p class="legend" style="margin-top:12px">รูปแบบไฟล์นำเข้า: หัวคอลัมน์ควรมีคำว่า <code>เลขที่เช็ค/อ้างอิง</code>, <code>โรงแรม</code>, <code>รายการ</code>, <code>ยอด</code>, <code>กำหนดชำระ</code>, <code>วันที่จะจ่าย</code> (ภาษาไทยหรืออังกฤษก็ได้) · วันที่รับได้ทั้ง 2026-07-20, 20/07/2026 หรือปี พ.ศ. · ระบบจับคู่เลขที่เช็คซ้ำให้อัตโนมัติ (อัปเดตทับ ไม่เพิ่มซ้ำ)</p>
   </div>`;
 }
 
@@ -1531,7 +1611,10 @@ function delItem(path,i){if(ro())return;let o=state;path.forEach(p=>o=o[p]);o.sp
 
 // ---- จ่ายเงินสด (เชค operation + financing) ----
 function editPay(kind,i,field,val){ if(ro())return; const p=state.payments[kind][i]; if(!p)return; if(field==='amount') p.amount=numParse(val); else p[field]=val; save(); render(); }
-function addPay(kind){ if(ro())return; const idKey=kind==='operation'?'cheqNo':'ref'; const o={id:kind[0]+Date.now()}; o[idKey]=''; o.hotel=''; o.item=''; o.amount=0; o.date=''; state.payments[kind].push(o); save(); render(); }
+function addPay(kind){ if(ro())return; const idKey=kind==='operation'?'cheqNo':'ref'; const o={id:kind[0]+Date.now()}; o[idKey]=''; o.hotel=''; o.item=''; o.amount=0; o.dueDate=''; o.date=''; o.status=''; state.payments[kind].push(o); save(); render(); }
+// ตั้งสถานะรายการจ่ายจากปุ่มในแถบแจ้งเตือน (ค้นด้วย id) — ''=อัตโนมัติ | 'hold'=เลื่อนจ่าย | 'paid'=ยืนยันจ่ายแล้ว
+function setPayStatusById(kind,id,status){ if(ro())return; const list=state.payments[kind]||[]; const p=list.find(x=>x.id===id); if(!p)return; p.status=status; save(); render();
+  toast(status==='hold'?'⏸️ เลื่อนจ่ายแล้ว — จะไม่ตัดเงินสดจนกว่าจะเปลี่ยนสถานะ':status==='paid'?'✅ ทำเครื่องหมายว่าจ่ายแล้ว':'⚙️ กลับเป็นตัดอัตโนมัติ'); }
 function delPay(kind,i){ if(ro())return; state.payments[kind].splice(i,1); save(); render(); }
 async function importPay(kind,inp){ if(ro()){inp.value='';return;} const f=inp.files[0]; if(!f)return;
   const name=f.name.toLowerCase();
@@ -1547,36 +1630,40 @@ async function importPay(kind,inp){ if(ro()){inp.value='';return;} const f=inp.f
     const cHotel=colIndex(hdr,['โรงแรม','hotel','ตึก','สาขา']);
     const cItem=colIndex(hdr,['รายการ','item','detail','คำอธิบาย','description']);
     const cAmt=colIndex(hdr,['ยอด','amount','จำนวน','บาท']);
-    const cDate=colIndex(hdr,['วันที่','date','กำหนด']);
+    const cDue=colIndex(hdr,['กำหนดชำระ','ครบกำหนด','due date','duedate','due']);
+    let cDate=colIndex(hdr,['วันที่จะจ่าย','วันที่จ่าย','วันจ่าย','วันที่ตัด','pay date','date','วันที่','กำหนด']);
+    if(cDate===cDue) cDate=-1;   // ถ้าเจอคอลัมน์เดียว (เช่น 'กำหนด') ให้ถือเป็นกำหนดชำระ ไม่ใช่วันจ่าย
     let added=0,updated=0,skipped=0; const list=state.payments[kind];
     for(let r=1;r<aoa.length;r++){ const row=aoa[r];
       const idv=cId>=0?(''+row[cId]).trim():'';
       const hotelName=cHotel>=0?(''+row[cHotel]).trim():'';
       const item=cItem>=0?(''+row[cItem]).trim():'';
       const amount=cAmt>=0?numParse(row[cAmt]):0;
+      const dueDate=cDue>=0?normDate(row[cDue]):'';
       const date=cDate>=0?normDate(row[cDate]):'';
       if(!amount && !item && !idv){ skipped++; continue; }
       const hk=hotelKeyFromName(hotelName)||hotelName;
       let ex=idv? list.find(p=>((''+(p[idKey]||'')).trim()===idv)) : null;
-      if(ex){ ex.hotel=hk||ex.hotel; ex.item=item||ex.item; ex.amount=amount; if(date)ex.date=date; updated++; }
-      else { const o={id:kind[0]+Date.now()+'_'+r}; o[idKey]=idv; o.hotel=hk; o.item=item; o.amount=amount; o.date=date; list.push(o); added++; }
+      if(ex){ ex.hotel=hk||ex.hotel; ex.item=item||ex.item; ex.amount=amount; if(date)ex.date=date; if(dueDate)ex.dueDate=dueDate; updated++; }
+      else { const o={id:kind[0]+Date.now()+'_'+r}; o[idKey]=idv; o.hotel=hk; o.item=item; o.amount=amount; o.dueDate=dueDate; o.date=date; o.status=''; list.push(o); added++; }
     }
     save(); render(); toast(`นำเข้าสำเร็จ — เพิ่ม ${added} · อัปเดต(เลขซ้ำ) ${updated}${skipped?' · ข้าม '+skipped:''}`);
   }catch(e){ console.error(e); toast('นำเข้าไม่สำเร็จ: '+(e.message||e)); }
   inp.value='';
 }
 async function exportPay(kind,ext){ const idKey=kind==='operation'?'cheqNo':'ref'; const idLabel=kind==='operation'?'เลขที่เช็ค':'เลขที่อ้างอิง';
-  const aoa=[[idLabel,'โรงแรม','รายการจ่าย','ยอดจ่าย','วันที่จ่าย','สถานะ']];
+  const stTxt=p=>p.void?'ยกเลิก':isPaid(p)?'จ่ายแล้ว':(p.status==='hold'?'เลื่อนจ่าย':(isOverdueUnpaid(p)?'เลยกำหนดชำระ':'รอจ่าย'));
+  const aoa=[[idLabel,'โรงแรม','รายการจ่าย','ยอดจ่าย','กำหนดชำระ','วันที่จะจ่าย','สถานะ']];
   (state.payments[kind]||[]).forEach(p=>{ const hk=hotelKeyFromName(p.hotel); const hn=hk?state.hotels[hk].name:(p.hotel||'');
-    aoa.push([p[idKey]||'',hn,p.item||'',(+p.amount||0),p.date||'',p.date?(paymentDue(p)?'ตัดแล้ว':'รอตัด'):'ไม่มีวันที่']); });
+    aoa.push([p[idKey]||'',hn,p.item||'',(+p.amount||0),p.dueDate||'',p.date||'',stTxt(p)]); });
   const base=(kind==='operation'?'operation_cheques':'financing')+'_'+todayStr();
   try{ if(ext==='xlsx'){ await ensureXLSX(); const ws=XLSX.utils.aoa_to_sheet(aoa); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,kind); XLSX.writeFile(wb,base+'.xlsx'); }
     else downloadCSV(aoa,base+'.csv'); toast('ส่งออกไฟล์แล้ว'); }
   catch(e){ console.error(e); toast('ส่งออกไม่สำเร็จ: '+(e.message||e)); }
 }
 function downloadTemplate(kind){ const idLabel=kind==='operation'?'เลขที่เช็ค':'เลขที่อ้างอิง';
-  const aoa=[[idLabel,'โรงแรม','รายการจ่าย','ยอดจ่าย','วันที่จ่าย'],
-    kind==='operation'?['CHQ-0001','บ่อวิน','ค่าวัสดุก่อสร้าง',150000,'2026-07-20']:['FIN-0001','Prime','ผ่อนแบงก์กรุงเทพ',1000000,'2026-07-25']];
+  const aoa=[[idLabel,'โรงแรม','รายการจ่าย','ยอดจ่าย','กำหนดชำระ','วันที่จะจ่าย'],
+    kind==='operation'?['CHQ-0001','บ่อวิน','ค่าวัสดุก่อสร้าง',150000,'2026-07-15','2026-07-20']:['FIN-0001','Prime','ผ่อนแบงก์กรุงเทพ',1000000,'2026-07-25','2026-07-25']];
   downloadCSV(aoa,(kind==='operation'?'template_operation_cheque':'template_financing')+'.csv'); }
 
 // ---- สัญญาเงินกู้ + โน้ต (หน้าแผนปิดหนี้บริษัท) ----
