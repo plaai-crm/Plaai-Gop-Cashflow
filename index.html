@@ -118,6 +118,131 @@ code{background:#f0ede6;padding:1px 6px;border-radius:4px;font-size:12.5px;}
 .login-card .go:hover{background:var(--navy2);}
 .login-card .err{color:var(--neg);font-size:13px;text-align:center;min-height:18px;margin-top:10px;}
 .login-card .hintbox{font-size:12px;color:var(--muted);text-align:center;margin-top:14px;line-height:1.6;}
+
+/* ============================================================
+   ✦ PLAAI PREMIUM DESIGN SYSTEM (board-ready overhaul) ✦
+   วางไว้ท้ายสุดเพื่อ override สไตล์เดิม โดยไม่แตะโครงสร้าง/คลาสเดิม
+   ============================================================ */
+:root{
+  --shadow-sm:0 1px 2px rgba(20,30,60,.05),0 1px 3px rgba(20,30,60,.06);
+  --shadow-md:0 4px 14px rgba(20,30,60,.07),0 2px 6px rgba(20,30,60,.05);
+  --shadow-lg:0 12px 34px rgba(20,30,60,.10);
+  --ring:rgba(178,142,76,.35);
+  --ink-soft:#3a465e;
+}
+body{background:radial-gradient(1200px 600px at 12% -8%,#faf7f0 0%,var(--bg) 46%),var(--bg);font-size:15px;letter-spacing:.01em;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+.val,.num,td,th,input.cell,input[type=number],.kpi .box .val,.cashcalc .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+
+/* ---- Header ---- */
+header{padding:14px 24px;box-shadow:0 4px 18px rgba(20,30,60,.20);}
+header .mark{background:linear-gradient(145deg,#c8a86a,#a9822f);box-shadow:0 3px 10px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.35);}
+header h1{letter-spacing:.14em;font-weight:800;}
+header .sub{opacity:.72;}
+
+/* ---- Nav pills ---- */
+nav{gap:5px;padding:10px 18px;background:linear-gradient(180deg,#ffffff,#fcfaf5);box-shadow:0 1px 0 var(--line),0 6px 14px -12px rgba(20,30,60,.25);}
+nav button{background:transparent;color:var(--ink-soft);padding:9px 15px;border-radius:10px;font-weight:600;letter-spacing:.01em;position:relative;}
+nav button:hover{background:#f2eee5;color:var(--navy);}
+nav button.active{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;box-shadow:0 4px 12px -3px rgba(36,63,102,.55);}
+nav button.active::after{content:"";position:absolute;left:16px;right:16px;bottom:-9px;height:3px;border-radius:3px;background:var(--gold);opacity:0;}
+
+/* ---- Cards ---- */
+main{max-width:1240px;padding:24px 20px 40px;}
+.card{border-radius:18px;padding:24px 26px;box-shadow:var(--shadow-md);border:1px solid #eee8dc;position:relative;}
+.card::before{content:"";position:absolute;left:0;top:22px;bottom:22px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--gold),transparent);opacity:0;transition:.2s;}
+h2{font-size:19px;letter-spacing:.005em;color:var(--navy);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+h3{color:var(--navy);}
+.hint{color:var(--muted);}
+
+/* ---- KPI cards ---- */
+.kpi{gap:16px;}
+.kpi .box{background:linear-gradient(160deg,#fffdf9,#faf6ee);border:1px solid #ece4d3;border-left:none;border-radius:14px;padding:16px 18px 15px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s;}
+.kpi .box::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--gold);}
+.kpi .box:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);}
+.kpi .box .lbl{color:#6b7488;font-weight:600;letter-spacing:.01em;text-transform:none;}
+.kpi .box .val{font-size:25px;font-weight:800;color:var(--navy);letter-spacing:-.015em;}
+.kpi .box .cap{color:#9aa0ad;}
+
+/* ---- Tables ---- */
+.tblwrap{box-shadow:var(--shadow-sm);border:1px solid var(--line);}
+table{font-size:13.5px;}
+thead th{background:linear-gradient(180deg,#faf7f1,#f4efe5);color:#5a6379;text-transform:none;letter-spacing:.02em;border-bottom:2px solid #e4ddce;padding-top:11px;padding-bottom:11px;}
+tbody tr{transition:background .1s;}
+tbody tr:nth-child(even) td{background:#fcfbf8;}
+tbody tr:nth-child(even) td:first-child{background:#fcfbf8;}
+tbody tr:hover td{background:#f4f7fb;}
+tbody tr:hover td:first-child{background:#f4f7fb;}
+tr.total td{background:#f5f1e7;border-top:2px solid var(--gold);}
+td.pos{color:var(--pos);font-weight:600;} td.neg{color:var(--neg);font-weight:600;}
+input.cell{background:#f4f1eb;border:1px solid #ece7dc;transition:.12s;}
+input.cell:focus{border-color:var(--gold);background:#fff;box-shadow:0 0 0 3px var(--ring);}
+
+/* ---- Buttons ---- */
+button.mini{box-shadow:var(--shadow-sm);transition:.12s;}
+button.mini:hover{transform:translateY(-1px);filter:brightness(1.03);}
+button.mini.primary{background:linear-gradient(135deg,var(--navy),var(--navy2));}
+button.mini.gold{background:linear-gradient(135deg,#c8a86a,#a9822f);}
+.yrtabs button.active{background:linear-gradient(135deg,var(--navy),var(--navy2));box-shadow:0 4px 12px -4px rgba(36,63,102,.5);}
+
+/* ---- Cash / verdict panels ---- */
+.cashpanel{box-shadow:var(--shadow-sm);}
+.cashpanel .verdict{font-size:20px;}
+.cashcalc .item{box-shadow:var(--shadow-sm);border-radius:12px;}
+.cashcalc .item.result{box-shadow:var(--shadow-md);}
+.callout{box-shadow:var(--shadow-sm);}
+
+/* ---- Section eyebrow (small gold bar before a heading) ---- */
+.eyebrow{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin:2px 0 4px;}
+.eyebrow::before{content:"";width:22px;height:3px;border-radius:3px;background:var(--gold);}
+
+/* ---- Chart card ---- */
+.chartcard{background:linear-gradient(180deg,#ffffff,#fcfbf7);border:1px solid #ece5d6;border-radius:16px;padding:18px 20px;margin-top:18px;box-shadow:var(--shadow-sm);}
+.chartcard .ct{font-weight:800;font-size:15px;color:var(--navy);margin:0 0 2px;display:flex;align-items:center;gap:8px;}
+.chartcard .cs{font-size:12.5px;color:var(--muted);margin:0 0 12px;line-height:1.6;}
+.chartcard.empty{color:var(--muted);font-size:13.5px;text-align:center;padding:34px 20px;background:repeating-linear-gradient(45deg,#fbfaf6,#fbfaf6 12px,#f7f4ec 12px,#f7f4ec 24px);}
+
+/* ---- Collapsible long lists ---- */
+details.collapsible{border:1px solid #e6e0d2;border-radius:14px;background:#fff;box-shadow:var(--shadow-sm);padding:0 18px;margin-top:14px;}
+details.collapsible[open]{padding-bottom:16px;}
+details.collapsible>summary{list-style:none;display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:var(--navy);padding:15px 2px;}
+details.collapsible>summary::-webkit-details-marker{display:none;}
+details.collapsible>summary::before{content:"▸";color:var(--gold);font-size:14px;transition:transform .18s;}
+details.collapsible[open]>summary::before{transform:rotate(90deg);}
+details.collapsible>summary .cnt{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted);background:#f2eee5;border:1px solid var(--line);padding:3px 11px;border-radius:20px;}
+
+/* ---- Presentation-mode toggle button (header) ---- */
+.present-toggle{border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.12);color:#fff;padding:8px 15px;border-radius:22px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:7px;transition:.15s;white-space:nowrap;}
+.present-toggle:hover{background:rgba(255,255,255,.2);}
+body.present .present-toggle{background:var(--gold);border-color:var(--gold);color:#1c2536;}
+
+/* ============================================================
+   🎬 PRESENTATION MODE — ซ่อนเครื่องมือแก้ไข เหลือแต่ตัวเลข+กราฟสะอาดๆ
+   ============================================================ */
+body.present .edit-only{display:none !important;}
+body.present button.mini{display:none !important;}
+body.present .subeditor{display:none !important;}
+body.present details{display:none !important;}
+body.present input.cell,body.present input[type=number],body.present input[type=text],body.present input[type=date],body.present input[type=month]{
+  border-color:transparent !important;background:transparent !important;box-shadow:none !important;
+  pointer-events:none;-webkit-appearance:none;appearance:none;color:var(--ink);font-weight:700;padding-left:2px;padding-right:2px;}
+body.present select{border-color:transparent !important;background:transparent !important;-webkit-appearance:none;appearance:none;pointer-events:none;color:var(--ink);font-weight:600;padding-right:4px;}
+body.present input[type=date]::-webkit-calendar-picker-indicator,body.present input[type=month]::-webkit-calendar-picker-indicator{display:none;}
+body.present .kpi .box{padding:18px 20px 17px;}
+body.present .kpi .box .val{font-size:28px;}
+body.present .cashpanel .verdict{font-size:23px;}
+body.present .card{box-shadow:var(--shadow-lg);}
+body.present .growthbox .hint,body.present .fxrow>label{opacity:.9;}
+/* กล่องแก้ไขที่เหลือ input อย่างเดียว ดูสะอาดขึ้นในโหมดพรีเซนต์ */
+body.present .growthbox,body.present .subeditor{background:transparent;border-color:transparent;}
+
+/* ---- Print / PDF handout ---- */
+@media print{
+  header,nav,.present-toggle,.syncbox,button.mini,.subeditor{display:none !important;}
+  body{background:#fff;}
+  .card{box-shadow:none;border:1px solid #ddd;break-inside:avoid;}
+  main{max-width:100%;padding:0;}
+}
+@media(max-width:820px){main{padding:16px 12px 32px;}.card{padding:18px 16px;}}
 </style>
 </head>
 <body>
@@ -136,6 +261,7 @@ code{background:#f0ede6;padding:1px 6px;border-radius:4px;font-size:12.5px;}
       <input type="date" id="asofDate" onchange="setAsOfManual(this.value)">
       <label><input type="checkbox" id="asofAuto" onchange="setAsOfAuto(this.checked)"> อัตโนมัติ</label>
     </div>
+    <button class="present-toggle" id="presentBtn" onclick="togglePresent()" title="สลับโหมดพรีเซนต์ — ซ่อนช่องแก้ไข/ปุ่ม เหลือแต่ตัวเลขและกราฟสะอาดๆ สำหรับขึ้นจอบอร์ด">🎬 โหมดพรีเซนต์</button>
     <div class="syncbox" id="syncbox" onclick="showTab('setup')"><span class="syncdot" id="syncdot"></span><span id="syncstatus">โหมดออฟไลน์</span></div>
     <div class="userchip" id="userchip" style="display:none"></div>
   </div>
@@ -685,9 +811,14 @@ function viewConstruction(){
         <h2 style="font-size:15px">การใช้เงิน (เงินไปไหน)</h2>
         <p class="hint">รวมช่อง "เงินให้โรงแรมยืมหมุนเวียน" = ยอดที่โรงแรมต้องยืมจาก construction มาใช้ก่อน เพราะเงินสดขาดมือจากภาระหนี้</p>
         ${useRows}
-        <button class="mini primary" onclick="addItem(['construction','uses'],{id:'u'+Date.now(),name:'รายการใหม่',amount:0})">+ เพิ่มรายการใช้เงิน</button>
+        <button class="mini primary edit-only" onclick="addItem(['construction','uses'],{id:'u'+Date.now(),name:'รายการใหม่',amount:0})">+ เพิ่มรายการใช้เงิน</button>
         <canvas id="usePie" height="200" style="margin-top:16px"></canvas>
       </div>
+    </div>
+    <div class="chartcard">
+      <div class="ct">📊 เงินเข้า vs เงินออก vs คงเหลือ</div>
+      <div class="cs">ภาพเดียวจบสำหรับที่ประชุม — เทียบเงินที่หามาได้ทั้งหมด กับที่ใช้ไปแล้ว และเงินที่ยังเหลือ</div>
+      <canvas id="consCompareChart" height="120"></canvas>
     </div>
   </div>`;
 }
@@ -1003,10 +1134,14 @@ function payTable(kind){
     </tr>`;
   }).join('');
   const total=list.reduce((s,p)=>s+(+p.amount||0),0);
-  return `<div class="tblwrap"><table>
+  const listLabel=kind==='operation'?'รายการเช็ค (Operation)':'รายการตัดบัญชี (Financing)';
+  return `<details class="collapsible" open>
+    <summary>📋 ${listLabel} — คลิกเพื่อซ่อน/แสดง <span class="cnt">${list.length} รายการ · รวม ${fmt0(total)} บาท</span></summary>
+    <div class="tblwrap" style="margin-top:6px"><table>
     <thead><tr><th style="text-align:left">${idLabel}</th><th style="text-align:left">โรงแรม</th><th style="text-align:left">รายการจ่าย</th><th>ยอดจ่าย</th><th>กำหนดชำระ</th><th>${dateLabel}</th><th>จัดการเช็ค</th><th>สถานะ</th><th></th></tr></thead>
     <tbody>${body}<tr class="total"><td colspan="3">รวม ${list.length} รายการ</td><td>${fmt0(total)}</td><td colspan="5"></td></tr></tbody>
-  </table></div>`;
+  </table></div>
+  </details>`;
 }
 function viewCash(){
   const a=effAsOf();
@@ -1167,14 +1302,17 @@ function viewFinancing(){
     <canvas id="finBalChart" height="120" style="margin-top:10px"></canvas>
   </div>
 
-  <div class="card">
+  <div class="card edit-only">
     <h2>📋 รายละเอียดสัญญาเงินกู้ (${loans.length} สัญญา) — แก้ได้ทุกช่อง</h2>
     <p class="hint">แก้ยอด/ดอกเบี้ย/ผ่อน แล้ววันปิดหนี้และกราฟจะคำนวณใหม่ทันที · ดอกเบี้ยใส่เป็น % ต่อปี (เช่น 6.35)</p>
-    <div class="tblwrap"><table>
+    <details class="collapsible" open>
+      <summary>รายการสัญญาเงินกู้ — คลิกเพื่อซ่อน/แสดง <span class="cnt">${loans.length} สัญญา · รวม ${fmt0(totalBal)} บาท</span></summary>
+      <div class="tblwrap" style="margin-top:6px"><table>
       <thead><tr><th style="text-align:left">โรงแรม</th><th style="text-align:left">ธนาคาร</th><th style="text-align:left">ประเภท</th><th>วงเงินกู้</th><th>ยอดคงเหลือ</th><th>ดอก%/ปี</th><th>ผ่อน/เดือน</th><th>เหลือ(ปี)</th><th style="text-align:left">คาดปิด / โน้ต</th><th></th></tr></thead>
       <tbody>${loanRows}<tr class="total"><td colspan="3">รวม</td><td></td><td>${fmt0(totalBal)}</td><td></td><td>${fmt0(totalMonthly)}</td><td colspan="3"></td></tr></tbody>
     </table></div>
     <button class="mini primary" style="margin-top:12px" onclick="addLoan()">+ เพิ่มสัญญาเงินกู้</button>
+    </details>
   </div>
 
   <div class="card">
@@ -1200,6 +1338,8 @@ function viewConsDetail(key){
   const used=s.uses.reduce((a,u)=>a+(+u.amount||0),0);
   const creditLeft=(+s.creditLine||0)-drawn;
   const cashInHand=drawn-used;
+  const hasFlow=s.draws.some(d=>(+d.amount||0)!==0)||s.uses.some(u=>(+u.amount||0)!==0);
+  const nTx=s.draws.length+s.uses.length;
   const drawRows=s.draws.length? s.draws.map((d,i)=>`<tr>
       <td><input class="cell" type="date" style="width:150px" value="${d.date||''}" onchange="editConsDraw('${key}',${i},'date',this.value)"></td>
       <td><input class="cell" value="${d.amount||0}" onchange="editConsDraw('${key}',${i},'amount',this.value)"></td>
@@ -1229,18 +1369,33 @@ function viewConsDetail(key){
       <div class="box" style="border-left-color:var(--neg)"><div class="lbl">ใช้จ่ายไปแล้วรวม</div><div class="val" style="color:var(--neg)">${fmt(used)}</div><div class="cap">บาท</div></div>
       <div class="box" style="border-left-color:var(--pos)"><div class="lbl">💰 เงินสดคงเหลือในมือ</div><div class="val" style="color:${cashInHand>=0?'var(--pos)':'var(--neg)'}">${fmt(cashInHand)}</div><div class="cap">เบิกเข้ามา − ใช้ไป</div></div>
     </div>
-    <h3 style="font-size:15px;margin:16px 0 8px">① การเบิก / รับเงินเข้า (แต่ละงวด)</h3>
-    <div class="tblwrap"><table>
-      <thead><tr><th>วันที่เบิก</th><th>ยอดที่เบิก/รับเข้า</th><th style="text-align:left">หมายเหตุ (งวดที่เท่าไหร่)</th><th></th></tr></thead>
-      <tbody>${drawRows}<tr class="total"><td>รวมเบิก</td><td>${fmt(drawn)}</td><td colspan="2"></td></tr></tbody>
-    </table></div>
-    <button class="mini primary" style="margin-top:10px" onclick="addConsDraw('${key}')">➕ เพิ่มงวดเบิก</button>
-    <h3 style="font-size:15px;margin:22px 0 8px">② การใช้เงิน (ใช้อะไรไปบ้าง)</h3>
-    <div class="tblwrap"><table>
-      <thead><tr><th>วันที่</th><th style="text-align:left">รายการที่ใช้</th><th>ยอด</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
-      <tbody>${useRows}<tr class="total"><td colspan="2">รวมใช้เงิน</td><td>${fmt(used)}</td><td colspan="2"></td></tr></tbody>
-    </table></div>
-    <button class="mini primary" style="margin-top:10px" onclick="addConsUse('${key}')">➕ เพิ่มรายการใช้เงิน</button>
+    <div class="grid2" style="margin-top:6px">
+      <div class="chartcard">
+        <div class="ct">📈 กระแสเงิน: เบิก · ใช้ · คงเหลือ (ตามเวลา)</div>
+        <div class="cs">แท่งเขียว = เงินเบิก/รับเข้า · แท่งแดง = ใช้จ่ายออก · เส้นน้ำเงิน = เงินสดในมือสะสม</div>
+        ${hasFlow?`<canvas id="consFlowChart" height="150"></canvas>`:`<div style="text-align:center;color:var(--muted);font-size:13.5px;padding:40px 16px;background:repeating-linear-gradient(45deg,#fbfaf6,#fbfaf6 12px,#f7f4ec 12px,#f7f4ec 24px);border-radius:10px">ยังไม่มีรายการเบิก/ใช้เงิน — เพิ่มรายการด้านล่างเพื่อให้กราฟแสดงผล</div>`}
+      </div>
+      <div class="chartcard">
+        <div class="ct">${isBank?'🏦 การใช้วงเงินกู้ (เบิกแล้ว vs คงเหลือ)':'💰 เบิกเข้า vs ใช้ไป'}</div>
+        <div class="cs">${isBank?'สัดส่วนวงเงินที่เบิกไปแล้ว เทียบกับที่ยังเบิกได้':'สัดส่วนเงินที่ใช้จ่ายไปแล้ว เทียบกับเงินคงเหลือในมือ'}</div>
+        <canvas id="consUtilChart" height="150"></canvas>
+      </div>
+    </div>
+    <details class="collapsible edit-only" open>
+      <summary>📋 รายละเอียดการเบิก &amp; การใช้เงิน (คลิกเพื่อซ่อน/แสดง) <span class="cnt">${nTx} รายการ</span></summary>
+      <h3 style="font-size:15px;margin:6px 0 8px">① การเบิก / รับเงินเข้า (แต่ละงวด)</h3>
+      <div class="tblwrap"><table>
+        <thead><tr><th>วันที่เบิก</th><th>ยอดที่เบิก/รับเข้า</th><th style="text-align:left">หมายเหตุ (งวดที่เท่าไหร่)</th><th></th></tr></thead>
+        <tbody>${drawRows}<tr class="total"><td>รวมเบิก</td><td>${fmt(drawn)}</td><td colspan="2"></td></tr></tbody>
+      </table></div>
+      <button class="mini primary" style="margin-top:10px" onclick="addConsDraw('${key}')">➕ เพิ่มงวดเบิก</button>
+      <h3 style="font-size:15px;margin:22px 0 8px">② การใช้เงิน (ใช้อะไรไปบ้าง)</h3>
+      <div class="tblwrap"><table>
+        <thead><tr><th>วันที่</th><th style="text-align:left">รายการที่ใช้</th><th>ยอด</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
+        <tbody>${useRows}<tr class="total"><td colspan="2">รวมใช้เงิน</td><td>${fmt(used)}</td><td colspan="2"></td></tr></tbody>
+      </table></div>
+      <button class="mini primary" style="margin-top:10px" onclick="addConsUse('${key}')">➕ เพิ่มรายการใช้เงิน</button>
+    </details>
   </div>`;
 }
 
@@ -1704,17 +1859,91 @@ function genPinCode(){
   pinIn.value='';
 }
 
+// ================= PRESENTATION MODE =================
+// สลับโหมดพรีเซนต์ (ซ่อนเครื่องมือแก้ไข เหลือแต่ตัวเลข+กราฟ) — เป็นการแสดงผลล้วนๆ ไม่แตะข้อมูล
+let presentMode=false;
+function applyPresentBtn(){ const b=document.getElementById('presentBtn'); if(b) b.innerHTML=presentMode?'✏️ กลับโหมดแก้ไข':'🎬 โหมดพรีเซนต์'; }
+function togglePresent(){
+  presentMode=!presentMode;
+  document.body.classList.toggle('present',presentMode);
+  try{localStorage.setItem('plaai_present',presentMode?'1':'0');}catch(e){}
+  applyPresentBtn();
+  if(typeof drawCharts==='function') drawCharts();   // วาดกราฟใหม่ให้เข้ากับธีมโหมดปัจจุบัน
+  toast(presentMode?'🎬 โหมดพรีเซนต์ — ซ่อนเครื่องมือแก้ไขแล้ว':'✏️ กลับสู่โหมดแก้ไข');
+}
+function restorePresent(){
+  try{ presentMode=(localStorage.getItem('plaai_present')==='1'); }catch(e){ presentMode=false; }
+  document.body.classList.toggle('present',presentMode);
+  applyPresentBtn();
+}
+
 // ================= CHARTS =================
+// ---- ธีมกราฟพรีเมียม (ใช้ร่วมทุกกราฟ) ----
+const CHART_INK='#3a465e', CHART_GRID='rgba(20,30,60,.07)';
+const CONS_PALETTE=['#243f66','#b28e4c','#1b7a4b','#0891b2','#7c3aed','#db2777','#64748b','#ea580c'];
+if(window.Chart){
+  Chart.defaults.font.family="'Noto Sans Thai','Segoe UI',system-ui,sans-serif";
+  Chart.defaults.font.size=12;
+  Chart.defaults.color=CHART_INK;
+  Chart.defaults.plugins.legend.labels.usePointStyle=true;
+  Chart.defaults.plugins.legend.labels.boxWidth=8;
+  Chart.defaults.plugins.legend.labels.padding=14;
+  Chart.defaults.plugins.tooltip.backgroundColor='rgba(22,35,61,.95)';
+  Chart.defaults.plugins.tooltip.padding=10;
+  Chart.defaults.plugins.tooltip.cornerRadius=8;
+  Chart.defaults.plugins.tooltip.titleFont={weight:'700'};
+  Chart.defaults.plugins.tooltip.boxPadding=5;
+}
+// สร้าง dataset ของ "กราฟเงินก่อสร้าง 3 แหล่ง" — cumulative เบิก vs ใช้ + เงินคงเหลือในมือ ตามวันที่
+function consDetailChartData(s){
+  const evs=[];
+  (s.draws||[]).forEach(d=>{ if((+d.amount||0)!==0) evs.push({date:d.date||'',draw:+d.amount||0,use:0}); });
+  (s.uses||[]).forEach(u=>{ if((+u.amount||0)!==0) evs.push({date:u.date||'',draw:0,use:+u.amount||0}); });
+  if(!evs.length) return null;
+  evs.sort((a,b)=>ymdToNum(a.date)-ymdToNum(b.date));
+  const labels=[],drawSeries=[],useSeries=[],handSeries=[];
+  let cumDraw=0,cumUse=0;
+  evs.forEach(e=>{ cumDraw+=e.draw; cumUse+=e.use;
+    labels.push(e.date?thaiDate(e.date):'ไม่ระบุวันที่');
+    drawSeries.push(e.draw); useSeries.push(-e.use); handSeries.push(cumDraw-cumUse); });
+  return {labels,drawSeries,useSeries,handSeries};
+}
 function drawCharts(){
   Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}});charts={};
-  if(currentTab==='construction'){
+  if(currentTab==='construction' && consSub==='overview'){
     const c=state.construction;
     const srcData=c.sources.map(s=>Math.max(0,+s.amount||0));
     const useData=c.uses.map(u=>Math.max(0,+u.amount||0));
     if(document.getElementById('srcPie')&&srcData.some(x=>x>0))
-      charts.s=new Chart(srcPie,{type:'doughnut',data:{labels:c.sources.map(s=>s.name),datasets:[{data:srcData,backgroundColor:['#243f66','#c0392b','#1b7a4b']}]},options:pieOpt('แหล่งเงิน')});
+      charts.s=new Chart(srcPie,{type:'doughnut',data:{labels:c.sources.map(s=>s.name),datasets:[{data:srcData,backgroundColor:['#243f66','#b28e4c','#1b7a4b'],borderWidth:2,borderColor:'#fff'}]},options:pieOpt('แหล่งเงิน')});
     if(document.getElementById('usePie')&&useData.some(x=>x>0))
-      charts.u=new Chart(usePie,{type:'doughnut',data:{labels:c.uses.map(u=>u.name),datasets:[{data:useData,backgroundColor:['#b28e4c','#7c3aed','#0891b2','#64748b','#db2777','#65a30d']}]},options:pieOpt('การใช้เงิน')});
+      charts.u=new Chart(usePie,{type:'doughnut',data:{labels:c.uses.map(u=>u.name),datasets:[{data:useData,backgroundColor:CONS_PALETTE,borderWidth:2,borderColor:'#fff'}]},options:pieOpt('การใช้เงิน')});
+    // แท่งเปรียบเทียบ แหล่งเงิน vs ใช้ไป vs คงเหลือ
+    if(document.getElementById('consCompareChart')){
+      const srcTotal=srcData.reduce((a,b)=>a+b,0), useTotal=useData.reduce((a,b)=>a+b,0);
+      charts.cc=new Chart(consCompareChart,{type:'bar',data:{labels:['แหล่งเงินรวม','ใช้ไปแล้ว','คงเหลือ'],datasets:[{data:[srcTotal,useTotal,srcTotal-useTotal],backgroundColor:['#243f66','#c0392b','#1b7a4b'],borderRadius:6,maxBarThickness:60}]},options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.parsed.x)+' บาท'}}},scales:{x:{grid:{color:CHART_GRID},ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}}});
+    }
+  }
+  if(currentTab==='construction' && consSub!=='overview'){
+    const s=state.consDetail[consSub];
+    const drawn=(s.draws||[]).reduce((a,d)=>a+(+d.amount||0),0);
+    const used=(s.uses||[]).reduce((a,u)=>a+(+u.amount||0),0);
+    const credit=+s.creditLine||0;
+    const cd=consDetailChartData(s);
+    if(document.getElementById('consFlowChart') && cd){
+      charts.cf=new Chart(consFlowChart,{data:{labels:cd.labels,datasets:[
+        {type:'bar',label:'เบิก/รับเข้า',data:cd.drawSeries,backgroundColor:'#1b7a4b',borderRadius:4,stack:'x'},
+        {type:'bar',label:'ใช้จ่ายออก',data:cd.useSeries,backgroundColor:'#c0392b',borderRadius:4,stack:'x'},
+        {type:'line',label:'💰 เงินสดคงเหลือในมือ (สะสม)',data:cd.handSeries,borderColor:'#243f66',backgroundColor:'rgba(36,63,102,.10)',borderWidth:2.5,tension:.25,pointRadius:3,pointBackgroundColor:'#243f66',fill:true}
+      ]},options:{interaction:{mode:'index',intersect:false},plugins:{legend:{position:'top'},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmt(Math.abs(c.parsed.y))+' บาท'}}},scales:{x:{stacked:true,grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:10}},y:{grid:{color:CHART_GRID},ticks:{callback:v=>fmt(v)}}}}});
+    }
+    if(document.getElementById('consUtilChart')){
+      let labels,data,colors;
+      if(credit>0){ labels=['เบิกแล้ว','วงเงินคงเหลือ (ยังเบิกได้)']; data=[Math.min(drawn,credit),Math.max(0,credit-drawn)]; colors=['#243f66','#e4ddce']; }
+      else { labels=['ใช้จ่ายไปแล้ว','เงินคงเหลือในมือ']; data=[used,Math.max(0,drawn-used)]; colors=['#c0392b','#1b7a4b']; }
+      if(data.some(x=>x>0))
+        charts.cu=new Chart(consUtilChart,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'66%',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)+' บาท'}}}}});
+    }
   }
   if(currentTab==='financing'){
     const rows=loanSchedule(financeRange);
@@ -1751,7 +1980,7 @@ function drawCharts(){
       ]},options:barOpt()});
   }
 }
-function pieOpt(t){return{plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},title:{display:true,text:t}}};}
+function pieOpt(t){return{cutout:'60%',plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:10,padding:12}},title:{display:true,text:t,font:{size:13,weight:'700'},color:'#16233d',padding:{bottom:8}},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)+' บาท'}}}};}
 function barOpt(){return{plugins:{legend:{display:true,position:'top'}},scales:{y:{ticks:{callback:v=>fmt(v)}}}};}
 
 // ================= SUPABASE SYNC =================
@@ -1977,6 +2206,7 @@ function startApp(){
 }
 
 // ================= INIT =================
+restorePresent();   // คืนค่าโหมดพรีเซนต์ที่เลือกไว้ล่าสุด
 initSupabase();   // โหลดไลบรารี Supabase ไว้ก่อน (ยังไม่ดึงข้อมูลจนกว่าจะล็อกอิน)
 buildLoginOptions();
 if(restoreSession()){
