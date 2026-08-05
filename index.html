@@ -1447,6 +1447,7 @@ function budgetStColor(st){
 function budgetItemRef(gi,ii){ return state.budget.groups[gi] && state.budget.groups[gi].items[ii]; }
 function setBudgetStatus(gi,ii,val){ if(roBudget())return; const it=budgetItemRef(gi,ii); if(!it)return; it.status=val; if(val==='drawn' && !it.drawNo) it.drawNo=1; if(val==='pending') it.drawNo=null; save(); render(); }
 function setBudgetDrawNo(gi,ii,val){ if(roBudget())return; const it=budgetItemRef(gi,ii); if(!it)return; it.drawNo=(val===''||val==null)?null:parseInt(val); save(); render(); }
+function setBudgetLoan(gi,ii,val){ if(roBudget())return; const it=budgetItemRef(gi,ii); if(!it)return; it.loan=numParse(val); save(); render(); }
 function editBudgetField(field,val){ if(roBudget())return; state.budget[field]=(field==='loanCap')?numParse(val):val; save(); render(); }
 function addBudgetDraw(){ if(roBudget())return; const ds=state.budget.draws; const nextNo=ds.length?Math.max(...ds.map(d=>+d.no||0))+1:1; ds.push({no:nextNo,date:'',amount:0,note:''}); save(); render(); }
 function editBudgetDraw(i,field,val){ if(roBudget())return; const d=state.budget.draws[i]; if(!d)return; d[field]=(field==='amount'||field==='no')?numParse(val):val; save(); render(); }
@@ -1533,11 +1534,14 @@ function viewBudget(){
       const noCell=ed?`<select class="budget-editable" onchange="setBudgetDrawNo(${gi},${ii},this.value)" style="padding:3px 4px">${noOpts(it.drawNo)}</select>`:(it.drawNo?('งวด '+it.drawNo):'–');
       const stCell=ed?`<select class="budget-editable" onchange="setBudgetStatus(${gi},${ii},this.value)" style="padding:3px 4px">${stOpts(it.status)}</select>`
                      :`<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600;background:${c.bg};color:${c.tx};border:1px solid ${c.bd}">${c.label}</span>`;
+      const loanCell=(ed && it.status==='drawn')
+        ?`<input class="cell budget-editable" style="width:110px;font-weight:700;text-align:right" value="${it.loan||0}" title="แก้ไขให้ตรงกับยอดที่แบงก์เบิกจริง (อาจไม่เท่า 50% เป๊ะ)" onchange="setBudgetLoan(${gi},${ii},this.value)">`
+        :`<b>${fmt(it.loan)}</b>`;
       bodyRows+=`<tr style="background:${c.bg};border-left:4px solid ${c.bd}">
         <td style="color:var(--muted)">${it.no}</td>
         <td style="text-align:left">${it.name}</td>
         <td>${fmt(it.value)}</td>
-        <td><b>${fmt(it.loan)}</b></td>
+        <td>${loanCell}</td>
         <td>${noCell}</td>
         <td>${stCell}</td></tr>`;
     });
@@ -1558,7 +1562,7 @@ function viewBudget(){
     </div>`:'';
 
   const editorNote=ed
-    ? `<p class="hint">✏️ คุณมีสิทธิ์แก้ไขงบนี้ — เปลี่ยน "สถานะ" และ "งวด" ของแต่ละรายการได้ (สีจะเปลี่ยนตามสถานะ) และบันทึกยอดเบิกจริงจากแบงก์ในตารางงวดด้านบน · ข้อมูลจะซิงก์ให้เจ้าของกิจการเห็นอัตโนมัติ</p>`
+    ? `<p class="hint">✏️ คุณมีสิทธิ์แก้ไขงบนี้ — เปลี่ยน "สถานะ" และ "งวด" ของแต่ละรายการได้ (สีจะเปลี่ยนตามสถานะ) และบันทึกยอดเบิกจริงจากแบงก์ในตารางงวดด้านบน · เมื่อตั้งสถานะเป็น "เบิกแล้ว" ช่อง "เบิกกู้ได้ 50%" ของรายการนั้นจะแก้ไขได้ ให้ใส่ยอดที่แบงก์เบิกจริง (กรณีไม่เท่า 50% เป๊ะ) · ข้อมูลจะซิงก์ให้เจ้าของกิจการเห็นอัตโนมัติ</p>`
     : `<p class="hint">👁️ หน้านี้สำหรับคุยตัวเลขกับเจ้าของกิจการ — สีเขียว=เบิกแล้ว · เหลือง=เตรียมเบิกงวดถัดไป · ขาว=ยังไม่เบิก (แก้ไขได้โดยเจ้าของกิจการ/บัญชี และผู้จัดการที่ดูแลบ่อวิน)</p>`;
 
   return `<div class="card">
