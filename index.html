@@ -1391,6 +1391,11 @@ function viewConsDetail(key){
   const usedByDraw={}; s.uses.forEach(u=>{ if(u.srcDraw){ usedByDraw[u.srcDraw]=(usedByDraw[u.srcDraw]||0)+(+u.amount||0); } });
   const unassignedUsed=s.uses.reduce((a,u)=>a+((!u.srcDraw)?(+u.amount||0):0),0);
   const usedByDrawTotal=Object.values(usedByDraw).reduce((a,v)=>a+v,0);
+  // ยอดใช้แยกตามผู้ใช้ (Owner/โรงแรม/ก่อสร้าง) — สำหรับกราฟวงกลม (เฉพาะแท็บแบงก์)
+  const useByCat={owner:0,hotel:0,construction:0,other:0};
+  s.uses.forEach(u=>{ const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
+  const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
+  const bankUseUnavail=Math.max(0,drawn-bankUseTotal);
   const CAT_LABEL={owner:'Owner',hotel:'โรงแรม',construction:'ก่อสร้าง',other:'อื่นๆ'};
   const catOptsHtml=(cur)=>['<option value="">– ไม่ระบุ</option>']
     .concat(['owner','hotel','construction','other'].map(v=>`<option value="${v}" ${cur===v?'selected':''}>${CAT_LABEL[v]}</option>`)).join('');
@@ -1452,6 +1457,12 @@ function viewConsDetail(key){
         <div class="cbox" style="height:250px"><canvas id="consUtilChart"></canvas></div>
       </div>
     </div>
+    ${isBank && drawn>0?`<div class="chartcard" style="margin-top:6px">
+      <div class="ct">🥧 เงินกู้ที่เบิกแล้ว ${fmt(drawn)} บาท — ใครดึงไปใช้เท่าไหร่</div>
+      <div class="cs">แบ่งตามผู้ใช้ที่บันทึกไว้ในตาราง "② การใช้เงิน" ด้านล่าง (Owner / โรงแรม / ก่อสร้าง) · ส่วนที่เหลือ = ยังไม่ถูกดึงไปใช้ (ใช้ได้อยู่)</div>
+      <div class="cbox" style="height:270px"><canvas id="bankCatChart"></canvas></div>
+      ${bankUseTotal>drawn?`<p class="hint" style="color:var(--neg)">⚠️ ยอดใช้เงินที่บันทึกไว้ (${fmt(bankUseTotal)}) มากกว่ายอดที่เบิกจริง (${fmt(drawn)}) — ลองตรวจสอบรายการด้านล่างอีกครั้ง</p>`:''}
+    </div>`:''}
     <details class="collapsible edit-only" open>
       <summary>📋 รายละเอียดการเบิก &amp; การใช้เงิน (คลิกเพื่อซ่อน/แสดง) <span class="cnt">${nTx} รายการ</span></summary>
       <h3 style="font-size:15px;margin:6px 0 8px">① การเบิก / รับเงินเข้า (แต่ละงวด)</h3>
@@ -1506,12 +1517,6 @@ function viewBudget(){
   const nDrawn=flat.filter(x=>x.status==='drawn').length, nReady=flat.filter(x=>x.status==='ready').length, nPend=flat.filter(x=>x.status==='pending').length;
   const bankDrawn=b.draws.reduce((s,d)=>s+(+d.amount||0),0);
   const cap=+b.loanCap||0; const capLeft=cap-bankDrawn; const pct=cap>0?Math.min(100,Math.round(bankDrawn/cap*100)):0;
-  // ---- เงินกู้ที่เบิกแล้วถูกใครดึงไปใช้บ้าง (Owner/โรงแรม/ก่อสร้าง) — อิงจากรายการ "การใช้เงิน" ที่บันทึกไว้ในแท็บ "แบงก์ 70 ล้าน" ----
-  const bankUses=(state.consDetail && state.consDetail.bank && state.consDetail.bank.uses)||[];
-  const useByCat={owner:0,hotel:0,construction:0,other:0};
-  bankUses.forEach(u=>{ const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
-  const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
-  const bankUseUnavail=Math.max(0,bankDrawn-bankUseTotal); // ยังไม่ถูกดึงไปใช้ = ใช้ได้อยู่
 
   // ---- KPI ----
   const kpi=`<div class="kpi">
@@ -1537,14 +1542,6 @@ function viewBudget(){
     <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#fdf3dd;border:1px solid #c8901f"></span> เตรียมเบิก งวดถัดไป (${nReady})</span>
     <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#fff;border:1px solid #cbc4b4"></span> ยังไม่เบิก (${nPend})</span>
   </div>`;
-
-  // ---- กราฟวงกลม: เงินกู้ที่เบิกแล้วถูกใครดึงไปใช้บ้าง ----
-  const bankUseChart=bankDrawn>0?`<div class="chartcard" style="margin:4px 0 18px">
-    <div class="ct">🥧 เงินกู้ที่เบิกแล้ว ${fmt(bankDrawn)} บาท — ใครดึงไปใช้เท่าไหร่</div>
-    <div class="cs">แบ่งตามผู้ใช้ที่บันทึกไว้ในตาราง "② การใช้เงิน" ของแท็บ "แบงก์ 70 ล้าน" · ส่วนที่เหลือ = ยังไม่ถูกดึงไปใช้ (ใช้ได้อยู่)</div>
-    <div class="cbox" style="height:270px"><canvas id="bankUseChart"></canvas></div>
-    ${bankUseTotal>bankDrawn?`<p class="hint" style="color:var(--neg)">⚠️ ยอดใช้เงินที่บันทึกไว้ (${fmt(bankUseTotal)}) มากกว่ายอดที่เบิกจริง (${fmt(bankDrawn)}) — ลองตรวจสอบรายการในแท็บ "แบงก์ 70 ล้าน" อีกครั้ง</p>`:''}
-  </div>`:'';
 
   // ---- ① สรุปการเบิกเป็นงวด ----
   const drawBody=b.draws.map((d,i)=>{
@@ -1626,7 +1623,6 @@ function viewBudget(){
     ${kpi}
     ${bar}
     ${legend}
-    ${bankUseChart}
     ${capBox}
     ${drawTable}
     ${bigTable}
@@ -2169,30 +2165,25 @@ function drawCharts(){
       charts.cc=new Chart(consCompareChart,{type:'bar',data:{labels:['แหล่งเงินรวม','ใช้ไปแล้ว','คงเหลือ'],datasets:[{data:[srcTotal,useTotal,srcTotal-useTotal],backgroundColor:['#243f66','#c0392b','#1b7a4b'],borderRadius:6,maxBarThickness:60}]},options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.parsed.x)+' บาท'}}},scales:{x:{grid:{color:CHART_GRID},ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}}});
     }
   }
-  if(currentTab==='construction' && consSub==='budget'){
-    const b=state.budget;
-    const bankDrawn=(b.draws||[]).reduce((s,d)=>s+(+d.amount||0),0);
-    const bankUses=(state.consDetail && state.consDetail.bank && state.consDetail.bank.uses)||[];
-    const useByCat={owner:0,hotel:0,construction:0,other:0};
-    bankUses.forEach(u=>{ const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
-    const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
-    const bankUseUnavail=Math.max(0,bankDrawn-bankUseTotal);
-    if(document.getElementById('bankUseChart')){
-      const CAT_LABEL2={owner:'Owner',hotel:'โรงแรม',construction:'ก่อสร้าง',other:'อื่นๆ/ไม่ระบุ'};
-      const CAT_COLOR2={owner:'#243f66',hotel:'#c8901f',construction:'#1b7a4b',other:'#8a857a'};
-      let labels=[],data=[],colors=[];
-      ['owner','hotel','construction','other'].forEach(cat=>{ if(useByCat[cat]>0){ labels.push(CAT_LABEL2[cat]); data.push(useByCat[cat]); colors.push(CAT_COLOR2[cat]); } });
-      if(bankUseUnavail>0){ labels.push('คงเหลือยังไม่ใช้ (ใช้ได้อยู่)'); data.push(bankUseUnavail); colors.push('#e4ddce'); }
-      if(data.some(x=>x>0))
-        charts.bu=new Chart(bankUseChart,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:pieOpt('เบิกแล้ว → ใครใช้ไปเท่าไหร่')});
-    }
-  }
   if(currentTab==='construction' && consSub!=='overview' && consSub!=='budget'){
     const s=state.consDetail[consSub];
     const drawn=(s.draws||[]).reduce((a,d)=>a+(+d.amount||0),0);
     const used=(s.uses||[]).reduce((a,u)=>a+(+u.amount||0),0);
     const credit=+s.creditLine||0;
     const cd=consDetailChartData(s);
+    if(consSub==='bank' && document.getElementById('bankCatChart')){
+      const useByCat={owner:0,hotel:0,construction:0,other:0};
+      (s.uses||[]).forEach(u=>{ const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
+      const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
+      const bankUseUnavail=Math.max(0,drawn-bankUseTotal);
+      const CAT_LABEL2={owner:'Owner',hotel:'โรงแรม',construction:'ก่อสร้าง',other:'อื่นๆ/ไม่ระบุ'};
+      const CAT_COLOR2={owner:'#243f66',hotel:'#c8901f',construction:'#1b7a4b',other:'#8a857a'};
+      let labels=[],data=[],colors=[];
+      ['owner','hotel','construction','other'].forEach(cat=>{ if(useByCat[cat]>0){ labels.push(CAT_LABEL2[cat]); data.push(useByCat[cat]); colors.push(CAT_COLOR2[cat]); } });
+      if(bankUseUnavail>0){ labels.push('คงเหลือยังไม่ใช้ (ใช้ได้อยู่)'); data.push(bankUseUnavail); colors.push('#e4ddce'); }
+      if(data.some(x=>x>0))
+        charts.bu=new Chart(bankCatChart,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:pieOpt('เบิกแล้ว → ใครใช้ไปเท่าไหร่')});
+    }
     if(document.getElementById('consFlowChart') && cd){
       charts.cf=new Chart(consFlowChart,{data:{labels:cd.labels,datasets:[
         {type:'bar',label:'เบิก/รับเข้า',data:cd.drawSeries,backgroundColor:'#1b7a4b',borderRadius:4,stack:'x'},
