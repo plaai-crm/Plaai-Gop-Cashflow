@@ -454,6 +454,8 @@ let sb=null, applyingRemote=false;
 
 function fmt(n){ if(n===null||n===undefined||isNaN(n)) return '–'; return Math.round(n).toLocaleString('en-US'); }
 function fmt0(n){ return (n<0?'-':'')+Math.abs(Math.round(n)).toLocaleString('en-US'); }
+// numFmt: สำหรับใส่ใน value ของ <input> ตัวเลขที่แก้ไขได้ — ใส่ลูกน้ำคั่นหลักพัน แต่ไม่ปัดเศษทศนิยม (ต่างจาก fmt() ที่ปัดเป็นจำนวนเต็มสำหรับแสดงผลอย่างเดียว)
+function numFmt(v){ const n=numParse(v); if(!isFinite(n)) return '0'; return n.toLocaleString('en-US',{maximumFractionDigits:6}); }
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
@@ -512,7 +514,17 @@ function migrate(){
   if(!state.consDetail) state.consDetail=JSON.parse(JSON.stringify(CONS_DETAIL_SEED));
   CONS_KEYS.forEach(k=>{ if(!state.consDetail[k]) state.consDetail[k]=JSON.parse(JSON.stringify(CONS_DETAIL_SEED[k]));
     if(!Array.isArray(state.consDetail[k].draws)) state.consDetail[k].draws=[];
-    if(!Array.isArray(state.consDetail[k].uses)) state.consDetail[k].uses=[]; });
+    if(!Array.isArray(state.consDetail[k].uses)) state.consDetail[k].uses=[];
+    // เติม id ให้งวดเบิกเก่า (ไว้ผูกกับรายการใช้เงินว่าใช้จากงวดไหน)
+    state.consDetail[k].draws.forEach((d,i)=>{ if(!d.id) d.id='dr'+i+'_'+Math.random().toString(36).slice(2,8); });
+    // เติมฟิลด์ใหม่ให้รายการใช้เงินเก่า: srcDraw (ใช้จากงวดเบิกไหน) · category (Owner/โรงแรม/ก่อสร้าง) · repayDate/repaid (กรณียืมชั่วคราวต้องคืน)
+    state.consDetail[k].uses.forEach(u=>{
+      if(u.srcDraw===undefined) u.srcDraw='';
+      if(u.category===undefined) u.category='';
+      if(u.repayDate===undefined) u.repayDate='';
+      if(u.repaid===undefined) u.repaid=false;
+    });
+  });
   // ---- โมดูลใหม่: งบลงทุนรายละเอียด บ่อวิน 2 (แยกงวด/สถานะ/สี) ----
   if(!state.budget || typeof state.budget!=='object') state.budget=JSON.parse(JSON.stringify(BUDGET_SEED));
   if(!Array.isArray(state.budget.groups)||!state.budget.groups.length) state.budget.groups=JSON.parse(JSON.stringify(BUDGET_SEED.groups));
@@ -794,11 +806,11 @@ function viewConstruction(){
   const useTotal=c.uses.reduce((s,x)=>s+(+x.amount||0),0);
   const srcRows=c.sources.map((s,i)=>`<div class="fxrow">
     <input type="text" value="${s.name.replace(/"/g,'&quot;')}" ${i===2?'disabled':''} onchange="editField(['construction','sources',${i},'name'],this.value)">
-    <input type="number" value="${s.amount||0}" ${i===2?'disabled':''} onchange="editField(['construction','sources',${i},'amount'],parseFloat(this.value)||0)">
+    <input type="text" inputmode="decimal" value="${numFmt(s.amount||0)}" ${i===2?'disabled':''} onchange="editField(['construction','sources',${i},'amount'],numParse(this.value))">
   </div>`).join('');
   const useRows=c.uses.map((u,i)=>`<div class="fxrow">
     <input type="text" value="${u.name.replace(/"/g,'&quot;')}" onchange="editField(['construction','uses',${i},'name'],this.value)">
-    <input type="number" value="${u.amount||0}" onchange="editField(['construction','uses',${i},'amount'],parseFloat(this.value)||0)">
+    <input type="text" inputmode="decimal" value="${numFmt(u.amount||0)}" onchange="editField(['construction','uses',${i},'amount'],numParse(this.value))">
     <button class="mini danger" onclick="delItem(['construction','uses'],${i})">ลบ</button>
   </div>`).join('');
   return `<div class="card">
@@ -816,8 +828,8 @@ function viewConstruction(){
         <p class="hint">1) เงินค่าก่อสร้างจากแบงก์ · 2) เงินยืมจากโรงแรม Plaai Plus บ่อวิน · 3) เงินยืม Owner (คำนวณจากยืม−คืนด้านล่าง)</p>
         <div class="edit-only">${srcRows}</div>
         <div class="edit-only" style="background:#eef4fb;border:1px solid #cfe0f2;border-radius:10px;padding:12px;margin-top:6px">
-          <div class="fxrow"><label style="min-width:130px">Owner — ยืมมา</label><input type="number" value="${c.ownerLoan.borrowed||0}" onchange="editField(['construction','ownerLoan','borrowed'],parseFloat(this.value)||0)"></div>
-          <div class="fxrow"><label style="min-width:130px">Owner — คืนไปแล้ว</label><input type="number" value="${c.ownerLoan.returned||0}" onchange="editField(['construction','ownerLoan','returned'],parseFloat(this.value)||0)"></div>
+          <div class="fxrow"><label style="min-width:130px">Owner — ยืมมา</label><input type="text" inputmode="decimal" value="${numFmt(c.ownerLoan.borrowed||0)}" onchange="editField(['construction','ownerLoan','borrowed'],numParse(this.value))"></div>
+          <div class="fxrow"><label style="min-width:130px">Owner — คืนไปแล้ว</label><input type="text" inputmode="decimal" value="${numFmt(c.ownerLoan.returned||0)}" onchange="editField(['construction','ownerLoan','returned'],numParse(this.value))"></div>
           <div style="font-size:13px;color:var(--muted)">คงค้าง Owner = <b>${fmt((+c.ownerLoan.borrowed||0)-(+c.ownerLoan.returned||0))}</b> บาท</div>
         </div>
         <div class="cbox" style="height:240px;margin-top:14px"><canvas id="srcPie"></canvas></div>
@@ -860,7 +872,7 @@ function viewHotel(h){
     rows+=`<tr${isAnchor?' style="background:#eef4fb"':''}>
       <td>${MONTH_TH[mo]} ${yr.slice(2)}${isAnchor?' <span class="pill" style="background:#dbeafe;color:#1e40af;font-size:10px">ณ ปัจจุบัน</span>':''}</td>
       <td>${gopInput}</td>
-      <td><input class="cell" value="${Math.round(debt)}" onchange="editDebt('${h}','${yr}','${mo}',this.value)"></td>
+      <td><input class="cell" value="${numFmt(Math.round(debt))}" onchange="editDebt('${h}','${yr}','${mo}',this.value)"></td>
       <td>${fmt(fix)}</td>
       <td class="${net>=0?'pos':'neg'}">${fmt0(net)}</td>
       <td class="${run>=0?'pos':'neg'}">${fmt0(run)}</td>
@@ -878,7 +890,7 @@ function viewHotel(h){
   // fixed cost editor
   const fcRows=(hotel.fixedCosts||[]).map((fc,i)=>`<div class="fxrow">
      <input type="text" value="${(fc.name||'').replace(/"/g,'&quot;')}" onchange="editFC('${h}',${i},'name',this.value)">
-     <input type="number" value="${fc.amount||0}" onchange="editFC('${h}',${i},'amount',parseFloat(this.value)||0)">
+     <input type="text" inputmode="decimal" value="${numFmt(fc.amount||0)}" onchange="editFC('${h}',${i},'amount',numParse(this.value))">
      <select onchange="editFC('${h}',${i},'mode',this.value)">
        <option value="monthly" ${fc.mode==='monthly'?'selected':''}>ทุกเดือน</option>
        <option value="provision" ${fc.mode==='provision'?'selected':''}>เฉลี่ย 12 เดือน</option>
@@ -892,7 +904,7 @@ function viewHotel(h){
   // debt items editor
   const diRows=(hotel.debtItems||[]).map((di,i)=>`<div class="fxrow">
      <input type="text" value="${(di.name||'').replace(/"/g,'&quot;')}" onchange="editDebtItem('${h}',${i},'name',this.value)">
-     <input type="number" value="${di.amount||0}" onchange="editDebtItem('${h}',${i},'amount',parseFloat(this.value)||0)">
+     <input type="text" inputmode="decimal" value="${numFmt(di.amount||0)}" onchange="editDebtItem('${h}',${i},'amount',numParse(this.value))">
      <select onchange="editDebtItem('${h}',${i},'mode',this.value)">
        <option value="monthly" ${di.mode==='pinned'?'':'selected'}>ทุกเดือนทั้งปี</option>
        <option value="pinned" ${di.mode==='pinned'?'selected':''}>ระบุเดือนเดียว</option>
@@ -932,7 +944,7 @@ function viewHotel(h){
     <div class="growthbox" style="background:#eef4fb;border-color:#cfe0f2;display:block">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <label>💵 เงินสดตั้งต้น ณ ปัจจุบัน (Cash on hand):</label>
-        <input type="number" value="${cashNow!==null?cashNow:''}" placeholder="ยังไม่ระบุ" onchange="editCashNow('${h}',this.value)">
+        <input type="text" inputmode="decimal" value="${cashNow!==null?numFmt(cashNow):''}" placeholder="ยังไม่ระบุ" onchange="editCashNow('${h}',this.value)">
         <button class="mini" onclick="editCashNow('${h}','')" title="ล้างค่า">ล้าง</button>
         <button class="mini" onclick="showTab('cash')" title="จัดการรายการจ่ายเงินสด/เชค">📋 จัดการรายการจ่าย</button>
       </div>
@@ -947,7 +959,7 @@ function viewHotel(h){
     </div>
     <div class="growthbox" style="background:#faf8f3;border-color:var(--line)">
       <label>เงินสดตั้งต้น (ยกมาต้นปี) ${yr}:</label>
-      <input type="number" value="${openCash}" onchange="editOpening('${h}',this.value)">
+      <input type="text" inputmode="decimal" value="${numFmt(openCash)}" onchange="editOpening('${h}',this.value)">
       <span class="hint">ใช้เป็นจุดตั้งต้นของ "เงินสดสะสม" เฉพาะเมื่อ<b>ไม่ได้</b>ระบุเงินสดคงเหลือ ณ ปัจจุบัน (หรือปีก่อนหน้าเดือนปัจจุบัน)</span>
     </div>
     <details><summary>⚙️ แก้ไขค่าใช้จ่ายหลัง GOP</summary>
@@ -1157,7 +1169,7 @@ function payTable(kind){
       <td style="text-align:left"><input class="cell" style="width:110px;text-align:left" value="${(''+(p[idKey]||'')).replace(/"/g,'&quot;')}" onchange="editPay('${kind}',${i},'${idKey}',this.value)"></td>
       <td style="text-align:left"><select onchange="editPay('${kind}',${i},'hotel',this.value)"><option value="">— เลือกตึก —</option>${hotelOpts(hk)}</select></td>
       <td style="text-align:left"><input class="cell" style="width:180px;text-align:left" value="${(p.item||'').replace(/"/g,'&quot;')}" onchange="editPay('${kind}',${i},'item',this.value)"></td>
-      <td><input class="cell" value="${p.amount||0}" onchange="editPay('${kind}',${i},'amount',this.value)"></td>
+      <td><input class="cell" value="${numFmt(p.amount||0)}" onchange="editPay('${kind}',${i},'amount',this.value)"></td>
       <td><input class="cell" type="date" style="width:140px" value="${p.dueDate||''}" onchange="editPay('${kind}',${i},'dueDate',this.value)" title="วันครบกำหนดชำระที่คู่ค้ากำหนด"></td>
       <td><input class="cell" type="date" style="width:140px" value="${p.date||''}" onchange="editPay('${kind}',${i},'date',this.value)" title="วันที่จะจ่ายจริง — เมื่อถึงวันนี้ระบบตัดเงินสดอัตโนมัติ"></td>
       <td>${payStatusSelect(kind,i,p)}</td>
@@ -1293,10 +1305,10 @@ function viewFinancing(){
       <td style="text-align:left"><input class="cell" style="width:150px;text-align:left" value="${(l.hotel||'').replace(/"/g,'&quot;')}" onchange="editLoan(${i},'hotel',this.value)"></td>
       <td style="text-align:left"><input class="cell" style="width:110px;text-align:left" value="${(l.bank||'').replace(/"/g,'&quot;')}" onchange="editLoan(${i},'bank',this.value)"></td>
       <td style="text-align:left"><input class="cell" style="width:70px;text-align:left" value="${(l.type||'').replace(/"/g,'&quot;')}" onchange="editLoan(${i},'type',this.value)"></td>
-      <td><input class="cell" value="${l.limit||0}" onchange="editLoan(${i},'limit',this.value)"></td>
-      <td><input class="cell" value="${Math.round(l.balance||0)}" onchange="editLoan(${i},'balance',this.value)"></td>
+      <td><input class="cell" value="${numFmt(l.limit||0)}" onchange="editLoan(${i},'limit',this.value)"></td>
+      <td><input class="cell" value="${numFmt(Math.round(l.balance||0))}" onchange="editLoan(${i},'balance',this.value)"></td>
       <td><input class="cell" style="width:70px" value="${((+l.rate||0)*100).toFixed(2)}" onchange="editLoan(${i},'rate',this.value)"></td>
-      <td><input class="cell" value="${l.monthly||0}" onchange="editLoan(${i},'monthly',this.value)"></td>
+      <td><input class="cell" value="${numFmt(l.monthly||0)}" onchange="editLoan(${i},'monthly',this.value)"></td>
       <td>${po.payable?(po.months/12).toFixed(1):'∞ (OD)'}</td>
       <td style="text-align:left">${po.payable?ymTh(po.date):'หมุนเวียน'}<br><input class="cell" style="width:150px;text-align:left;font-size:12px" placeholder="โน้ต/คอมเมนต์" value="${(l.note||'').replace(/"/g,'&quot;')}" onchange="editLoan(${i},'note',this.value)"></td>
       <td><button class="mini danger" onclick="delLoan(${i})">ลบ</button></td>
@@ -1373,26 +1385,51 @@ function viewConsDetail(key){
   const cashInHand=drawn-used;
   const hasFlow=s.draws.some(d=>(+d.amount||0)!==0)||s.uses.some(u=>(+u.amount||0)!==0);
   const nTx=s.draws.length+s.uses.length;
-  const drawRows=s.draws.length? s.draws.map((d,i)=>`<tr>
-      <td><input class="cell" type="date" style="width:150px" value="${d.date||''}" onchange="editConsDraw('${key}',${i},'date',this.value)"></td>
-      <td><input class="cell" value="${d.amount||0}" onchange="editConsDraw('${key}',${i},'amount',this.value)"></td>
-      <td style="text-align:left"><input class="cell" style="width:260px;text-align:left" value="${(d.note||'').replace(/"/g,'&quot;')}" placeholder="เช่น เบิกงวดแรก / รับเงินเข้า" onchange="editConsDraw('${key}',${i},'note',this.value)"></td>
-      <td><button class="mini danger" onclick="delConsDraw('${key}',${i})">ลบ</button></td></tr>`).join('')
-    : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการเบิก — กด "➕ เพิ่มงวดเบิก"</td></tr>`;
-  const useRows=s.uses.length? s.uses.map((u,i)=>`<tr>
-      <td><input class="cell" type="date" style="width:150px" value="${u.date||''}" onchange="editConsUse('${key}',${i},'date',this.value)"></td>
-      <td style="text-align:left"><input class="cell" style="width:240px;text-align:left" value="${(u.item||'').replace(/"/g,'&quot;')}" placeholder="ใช้ทำอะไร" onchange="editConsUse('${key}',${i},'item',this.value)"></td>
-      <td><input class="cell" value="${u.amount||0}" onchange="editConsUse('${key}',${i},'amount',this.value)"></td>
-      <td style="text-align:left"><input class="cell" style="width:160px;text-align:left" value="${(u.note||'').replace(/"/g,'&quot;')}" placeholder="หมายเหตุ" onchange="editConsUse('${key}',${i},'note',this.value)"></td>
-      <td><button class="mini danger" onclick="delConsUse('${key}',${i})">ลบ</button></td></tr>`).join('')
-    : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการใช้เงิน — กด "➕ เพิ่มรายการใช้เงิน"</td></tr>`;
+  const today=todayStr();
+  // ยอดที่ใช้ไปแล้วของแต่ละงวดเบิก (ผูกจาก use.srcDraw === draw.id)
+  const usedByDraw={}; s.uses.forEach(u=>{ if(u.srcDraw){ usedByDraw[u.srcDraw]=(usedByDraw[u.srcDraw]||0)+(+u.amount||0); } });
+  const unassignedUsed=s.uses.reduce((a,u)=>a+((!u.srcDraw)?(+u.amount||0):0),0);
+  const usedByDrawTotal=Object.values(usedByDraw).reduce((a,v)=>a+v,0);
+  const CAT_LABEL={owner:'Owner',hotel:'โรงแรม',construction:'ก่อสร้าง',other:'อื่นๆ'};
+  const catOptsHtml=(cur)=>['<option value="">– ไม่ระบุ</option>']
+    .concat(['owner','hotel','construction','other'].map(v=>`<option value="${v}" ${cur===v?'selected':''}>${CAT_LABEL[v]}</option>`)).join('');
+  const drawOptsHtml=(cur)=>['<option value="">–</option>']
+    .concat(s.draws.map((d,i)=>`<option value="${d.id}" ${cur===d.id?'selected':''}>งวด ${i+1}</option>`)).join('');
+  const drawRows=s.draws.length? s.draws.map((d,i)=>{
+      const usedIn=usedByDraw[d.id]||0; const remain=(+d.amount||0)-usedIn;
+      return `<tr>
+      <td style="color:var(--muted)"><b>งวดที่ ${i+1}</b></td>
+      <td><input class="cell" type="date" style="width:112px" value="${d.date||''}" onchange="editConsDraw('${key}',${i},'date',this.value)"></td>
+      <td><input class="cell" value="${numFmt(d.amount||0)}" onchange="editConsDraw('${key}',${i},'amount',this.value)"></td>
+      <td style="color:var(--neg)">${fmt(usedIn)}</td>
+      <td style="color:${remain>=0?'var(--pos)':'var(--neg)'}"><b>${fmt(remain)}</b></td>
+      <td style="text-align:left"><input class="cell" style="width:220px;text-align:left" value="${(d.note||'').replace(/"/g,'&quot;')}" placeholder="เช่น เบิกงวดแรก / รับเงินเข้า" onchange="editConsDraw('${key}',${i},'note',this.value)"></td>
+      <td><button class="mini danger" onclick="delConsDraw('${key}',${i})">ลบ</button></td></tr>`;
+    }).join('')
+    : `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการเบิก — กด "➕ เพิ่มงวดเบิก"</td></tr>`;
+  const useRows=s.uses.length? s.uses.map((u,i)=>{
+      const overdue=u.repayDate && !u.repaid && u.repayDate<today;
+      return `<tr>
+      <td><input class="cell" type="date" style="width:112px" value="${u.date||''}" onchange="editConsUse('${key}',${i},'date',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:280px;text-align:left" value="${(u.item||'').replace(/"/g,'&quot;')}" placeholder="ใช้ทำอะไร" onchange="editConsUse('${key}',${i},'item',this.value)"></td>
+      <td><input class="cell" style="width:100px" value="${numFmt(u.amount||0)}" onchange="editConsUse('${key}',${i},'amount',this.value)"></td>
+      <td><select class="cell" style="padding:5px 2px;width:78px" onchange="editConsUse('${key}',${i},'srcDraw',this.value)">${drawOptsHtml(u.srcDraw||'')}</select></td>
+      <td><select class="cell" style="padding:5px 2px;width:88px" onchange="editConsUse('${key}',${i},'category',this.value)">${catOptsHtml(u.category||'')}</select></td>
+      <td>
+        <input class="cell" type="date" style="width:112px" value="${u.repayDate||''}" onchange="editConsUse('${key}',${i},'repayDate',this.value)" title="วันครบกำหนดคืนเงิน (กรณียืมไปใช้ชั่วคราว เช่น โรงแรมเบิกไปก่อน)">
+        ${u.repayDate?`<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;margin-top:3px;color:${overdue?'var(--neg)':'var(--muted)'}"><input type="checkbox" ${u.repaid?'checked':''} onchange="editConsUse('${key}',${i},'repaid',this.checked)"> ${u.repaid?'คืนแล้ว':(overdue?'⚠️ เลยกำหนดคืน':'ยังไม่คืน')}</label>`:''}
+      </td>
+      <td style="text-align:left"><input class="cell" style="width:110px;text-align:left" value="${(u.note||'').replace(/"/g,'&quot;')}" placeholder="หมายเหตุ" onchange="editConsUse('${key}',${i},'note',this.value)"></td>
+      <td><button class="mini danger" onclick="delConsUse('${key}',${i})">ลบ</button></td></tr>`;
+    }).join('')
+    : `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการใช้เงิน — กด "➕ เพิ่มรายการใช้เงิน"</td></tr>`;
   return `<div class="card">
     ${consSubNav()}
     <h2>🏗️ ${s.name}</h2>
     <p class="hint">${isBank?'วงเงินกู้ก่อสร้างจากธนาคาร แก้ยอดวงเงินได้ · บันทึกการเบิกแต่ละงวด (วันที่ · ยอด) และเงินที่ใช้ไป เพื่อรู้ว่าเหลือวงเงินและเงินสดในมือเท่าไหร่':'บันทึกเงินยืมที่รับเข้ามาแต่ละครั้ง และการใช้เงิน · ตั้งเพดานวงเงิน (ถ้ามี) ได้'}</p>
     <div class="growthbox" style="background:#faf6ee;border-color:#ece2cd">
       <label>${isBank?'💳 วงเงินกู้ธนาคารรวม:':'💳 เพดานวงเงินยืมรวม (ถ้ามี):'}</label>
-      <input type="number" value="${s.creditLine||0}" onchange="editConsField('${key}','creditLine',this.value)" style="width:160px">
+      <input type="text" inputmode="decimal" value="${numFmt(s.creditLine||0)}" onchange="editConsField('${key}','creditLine',this.value)" style="width:160px">
       <span class="hint">บาท — ${isBank?'ยอดวงเงินที่แบงก์อนุมัติ (เช่น 70,000,000)':'ใส่ 0 ถ้าไม่มีเพดานตายตัว'}</span>
     </div>
     <div class="kpi">
@@ -1417,15 +1454,17 @@ function viewConsDetail(key){
     <details class="collapsible edit-only" open>
       <summary>📋 รายละเอียดการเบิก &amp; การใช้เงิน (คลิกเพื่อซ่อน/แสดง) <span class="cnt">${nTx} รายการ</span></summary>
       <h3 style="font-size:15px;margin:6px 0 8px">① การเบิก / รับเงินเข้า (แต่ละงวด)</h3>
+      <p class="hint" style="margin:0 0 8px">คอลัมน์ "คงเหลืองวดนี้" = ยอดเบิกงวดนั้น − ยอดใช้เงินที่ระบุว่าใช้จากงวดนี้ (ในตาราง ② ด้านล่าง)</p>
       <div class="tblwrap"><table>
-        <thead><tr><th>วันที่เบิก</th><th>ยอดที่เบิก/รับเข้า</th><th style="text-align:left">หมายเหตุ (งวดที่เท่าไหร่)</th><th></th></tr></thead>
-        <tbody>${drawRows}<tr class="total"><td>รวมเบิก</td><td>${fmt(drawn)}</td><td colspan="2"></td></tr></tbody>
+        <thead><tr><th>งวด</th><th>วันที่เบิก</th><th>ยอดที่เบิก/รับเข้า</th><th>ใช้ไปจากงวดนี้</th><th>คงเหลืองวดนี้</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
+        <tbody>${drawRows}<tr class="total"><td colspan="2">รวมเบิก</td><td>${fmt(drawn)}</td><td style="color:var(--neg)">${fmt(usedByDrawTotal)}</td><td><b>${fmt(drawn-usedByDrawTotal)}</b></td><td colspan="2"></td></tr></tbody>
       </table></div>
       <button class="mini primary" style="margin-top:10px" onclick="addConsDraw('${key}')">➕ เพิ่มงวดเบิก</button>
       <h3 style="font-size:15px;margin:22px 0 8px">② การใช้เงิน (ใช้อะไรไปบ้าง)</h3>
+      <p class="hint" style="margin:0 0 8px">ระบุได้ว่าใช้เงินจากงวดเบิกไหน และผู้ใช้เป็น Owner / โรงแรม / ก่อสร้าง — ถ้าเป็นการยืมชั่วคราว (เช่นโรงแรมขอยืมไปใช้ก่อน) ให้ใส่วันครบกำหนดคืนด้วย${unassignedUsed?` · <b style="color:var(--neg)">ยังไม่ระบุงวด ${fmt(unassignedUsed)} บาท</b>`:''}</p>
       <div class="tblwrap"><table>
-        <thead><tr><th>วันที่</th><th style="text-align:left">รายการที่ใช้</th><th>ยอด</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
-        <tbody>${useRows}<tr class="total"><td colspan="2">รวมใช้เงิน</td><td>${fmt(used)}</td><td colspan="2"></td></tr></tbody>
+        <thead><tr><th>วันที่</th><th style="text-align:left">รายการที่ใช้</th><th>ยอด</th><th>ใช้จากงวด</th><th>ผู้ใช้/ประเภท</th><th>กำหนดคืนเงิน</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
+        <tbody>${useRows}<tr class="total"><td colspan="2">รวมใช้เงิน</td><td>${fmt(used)}</td><td colspan="5"></td></tr></tbody>
       </table></div>
       <button class="mini primary" style="margin-top:10px" onclick="addConsUse('${key}')">➕ เพิ่มรายการใช้เงิน</button>
     </details>
@@ -1497,7 +1536,7 @@ function viewBudget(){
     const inNo=flat.filter(x=>x.drawNo===d.no);
     const loanInNo=inNo.reduce((s,x)=>s+(+x.loan||0),0);
     const dateCell=ed?`<input class="cell budget-editable" type="date" style="width:150px" value="${d.date||''}" onchange="editBudgetDraw(${i},'date',this.value)">`:(d.date?thaiDate(d.date):'–');
-    const amtCell=ed?`<input class="cell budget-editable" style="width:130px" value="${d.amount||0}" onchange="editBudgetDraw(${i},'amount',this.value)">`:fmt(d.amount);
+    const amtCell=ed?`<input class="cell budget-editable" style="width:130px" value="${numFmt(d.amount||0)}" onchange="editBudgetDraw(${i},'amount',this.value)">`:fmt(d.amount);
     const noteCell=ed?`<input class="cell budget-editable" style="width:280px;text-align:left" value="${(d.note||'').replace(/"/g,'&quot;')}" onchange="editBudgetDraw(${i},'note',this.value)">`:(d.note||'');
     const del=ed?`<td><button class="mini danger budget-editable" onclick="delBudgetDraw(${i})">ลบ</button></td>`:'';
     return `<tr style="background:#e9f6ee">
@@ -1535,7 +1574,7 @@ function viewBudget(){
       const stCell=ed?`<select class="budget-editable" onchange="setBudgetStatus(${gi},${ii},this.value)" style="padding:3px 4px">${stOpts(it.status)}</select>`
                      :`<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600;background:${c.bg};color:${c.tx};border:1px solid ${c.bd}">${c.label}</span>`;
       const loanCell=(ed && it.status==='drawn')
-        ?`<input class="cell budget-editable" style="width:110px;font-weight:700;text-align:right" value="${it.loan||0}" title="แก้ไขให้ตรงกับยอดที่แบงก์เบิกจริง (อาจไม่เท่า 50% เป๊ะ)" onchange="setBudgetLoan(${gi},${ii},this.value)">`
+        ?`<input class="cell budget-editable" style="width:110px;font-weight:700;text-align:right" value="${numFmt(it.loan||0)}" title="แก้ไขให้ตรงกับยอดที่แบงก์เบิกจริง (อาจไม่เท่า 50% เป๊ะ)" onchange="setBudgetLoan(${gi},${ii},this.value)">`
         :`<b>${fmt(it.loan)}</b>`;
       bodyRows+=`<tr style="background:${c.bg};border-left:4px solid ${c.bd}">
         <td style="color:var(--muted)">${it.no}</td>
@@ -1557,7 +1596,7 @@ function viewBudget(){
 
   const capBox=ed?`<div class="growthbox" style="background:#faf6ee;border-color:#ece2cd;margin-bottom:12px">
       <label>💳 วงเงินกู้ธนาคารรวม:</label>
-      <input type="number" class="budget-editable" value="${cap}" onchange="editBudgetField('loanCap',this.value)" style="width:160px">
+      <input type="text" inputmode="decimal" class="budget-editable" value="${numFmt(cap)}" onchange="editBudgetField('loanCap',this.value)" style="width:160px">
       <span class="hint">บาท — วงเงินที่แบงก์อนุมัติ (เพดาน)</span>
     </div>`:'';
 
@@ -1900,7 +1939,7 @@ function viewSetup(){
 function editGOP(h,y,m,val){if(ro())return;const v=val.trim();state.hotels[h].gop[y]=state.hotels[h].gop[y]||{};state.hotels[h].gop[y][m]=(v===''?null:parseFloat(v.replace(/,/g,''))); save(); render();}
 function editDebt(h,y,m,val){if(ro())return;state.debtSchedule[y]=state.debtSchedule[y]||{};state.debtSchedule[y][m]=state.debtSchedule[y][m]||{};state.debtSchedule[y][m][h]=parseFloat(val.replace(/,/g,''))||0;save();render();}
 function editGrowth(h,y,val){if(ro())return;state.hotels[h].growth=state.hotels[h].growth||{};state.hotels[h].growth[y]=(parseFloat(val)||0)/100;save();render();}
-function editOpening(h,val){if(ro())return;state.settings.openingCash[h]=parseFloat(val)||0;save();render();}
+function editOpening(h,val){if(ro())return;state.settings.openingCash[h]=numParse(val);save();render();}
 function editCashNow(h,val){if(ro())return;const v=(val===''||val===null||val===undefined)?null:(parseFloat((''+val).replace(/,/g,''))||0);state.hotels[h].cashNow=v;save();render();}
 function setYear(h,y){currentYear[h]=y;render();}
 function addYear(ctx){
@@ -2017,8 +2056,8 @@ function editConsField(key,field,val){ if(ro())return; state.consDetail[key][fie
 function addConsDraw(key){ if(ro())return; state.consDetail[key].draws.push({id:'dr'+Date.now(),date:'',amount:0,note:''}); save(); render(); }
 function editConsDraw(key,i,field,val){ if(ro())return; const d=state.consDetail[key].draws[i]; if(!d)return; d[field]=(field==='amount')?numParse(val):val; save(); render(); }
 function delConsDraw(key,i){ if(ro())return; state.consDetail[key].draws.splice(i,1); save(); render(); }
-function addConsUse(key){ if(ro())return; state.consDetail[key].uses.push({id:'us'+Date.now(),date:'',item:'',amount:0,note:''}); save(); render(); }
-function editConsUse(key,i,field,val){ if(ro())return; const u=state.consDetail[key].uses[i]; if(!u)return; u[field]=(field==='amount')?numParse(val):val; save(); render(); }
+function addConsUse(key){ if(ro())return; state.consDetail[key].uses.push({id:'us'+Date.now(),date:'',item:'',amount:0,note:'',srcDraw:'',category:'',repayDate:'',repaid:false}); save(); render(); }
+function editConsUse(key,i,field,val){ if(ro())return; const u=state.consDetail[key].uses[i]; if(!u)return; u[field]=(field==='amount')?numParse(val):(field==='repaid'?!!val:val); save(); render(); }
 function delConsUse(key,i){ if(ro())return; state.consDetail[key].uses.splice(i,1); save(); render(); }
 
 function exportJSON(){const b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='plaai_hotel_data.json';a.click();}
