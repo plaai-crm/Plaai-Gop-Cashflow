@@ -74,6 +74,7 @@ input.cell.forecast{background:var(--forecast-bg);color:var(--forecast-ink);font
 .fxrow{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
 .fxrow input[type=text]{flex:1;min-width:180px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;}
 .fxrow input[type=number]{width:130px;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;text-align:right;font-size:14px;}
+.fxrow input.fxamt{flex:0 0 130px;width:130px;min-width:0;padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;text-align:right;font-size:14px;}
 .fxrow select{padding:9px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;}
 button.mini{border:none;background:#f0ede6;padding:9px 15px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600;font-size:13px;}
 button.mini.primary{background:var(--navy);color:#fff;}
@@ -806,11 +807,11 @@ function viewConstruction(){
   const useTotal=c.uses.reduce((s,x)=>s+(+x.amount||0),0);
   const srcRows=c.sources.map((s,i)=>`<div class="fxrow">
     <input type="text" value="${s.name.replace(/"/g,'&quot;')}" ${i===2?'disabled':''} onchange="editField(['construction','sources',${i},'name'],this.value)">
-    <input type="text" inputmode="decimal" value="${numFmt(s.amount||0)}" ${i===2?'disabled':''} onchange="editField(['construction','sources',${i},'amount'],numParse(this.value))">
+    <input type="text" inputmode="decimal" class="fxamt" value="${numFmt(s.amount||0)}" ${i===2?'disabled':''} onchange="editField(['construction','sources',${i},'amount'],numParse(this.value))">
   </div>`).join('');
   const useRows=c.uses.map((u,i)=>`<div class="fxrow">
     <input type="text" value="${u.name.replace(/"/g,'&quot;')}" onchange="editField(['construction','uses',${i},'name'],this.value)">
-    <input type="text" inputmode="decimal" value="${numFmt(u.amount||0)}" onchange="editField(['construction','uses',${i},'amount'],numParse(this.value))">
+    <input type="text" inputmode="decimal" class="fxamt" value="${numFmt(u.amount||0)}" onchange="editField(['construction','uses',${i},'amount'],numParse(this.value))">
     <button class="mini danger" onclick="delItem(['construction','uses'],${i})">ลบ</button>
   </div>`).join('');
   return `<div class="card">
@@ -828,8 +829,8 @@ function viewConstruction(){
         <p class="hint">1) เงินค่าก่อสร้างจากแบงก์ · 2) เงินยืมจากโรงแรม Plaai Plus บ่อวิน · 3) เงินยืม Owner (คำนวณจากยืม−คืนด้านล่าง)</p>
         <div class="edit-only">${srcRows}</div>
         <div class="edit-only" style="background:#eef4fb;border:1px solid #cfe0f2;border-radius:10px;padding:12px;margin-top:6px">
-          <div class="fxrow"><label style="min-width:130px">Owner — ยืมมา</label><input type="text" inputmode="decimal" value="${numFmt(c.ownerLoan.borrowed||0)}" onchange="editField(['construction','ownerLoan','borrowed'],numParse(this.value))"></div>
-          <div class="fxrow"><label style="min-width:130px">Owner — คืนไปแล้ว</label><input type="text" inputmode="decimal" value="${numFmt(c.ownerLoan.returned||0)}" onchange="editField(['construction','ownerLoan','returned'],numParse(this.value))"></div>
+          <div class="fxrow"><label style="min-width:130px">Owner — ยืมมา</label><input type="text" inputmode="decimal" class="fxamt" value="${numFmt(c.ownerLoan.borrowed||0)}" onchange="editField(['construction','ownerLoan','borrowed'],numParse(this.value))"></div>
+          <div class="fxrow"><label style="min-width:130px">Owner — คืนไปแล้ว</label><input type="text" inputmode="decimal" class="fxamt" value="${numFmt(c.ownerLoan.returned||0)}" onchange="editField(['construction','ownerLoan','returned'],numParse(this.value))"></div>
           <div style="font-size:13px;color:var(--muted)">คงค้าง Owner = <b>${fmt((+c.ownerLoan.borrowed||0)-(+c.ownerLoan.returned||0))}</b> บาท</div>
         </div>
         <div class="cbox" style="height:240px;margin-top:14px"><canvas id="srcPie"></canvas></div>
@@ -890,7 +891,7 @@ function viewHotel(h){
   // fixed cost editor
   const fcRows=(hotel.fixedCosts||[]).map((fc,i)=>`<div class="fxrow">
      <input type="text" value="${(fc.name||'').replace(/"/g,'&quot;')}" onchange="editFC('${h}',${i},'name',this.value)">
-     <input type="text" inputmode="decimal" value="${numFmt(fc.amount||0)}" onchange="editFC('${h}',${i},'amount',numParse(this.value))">
+     <input type="text" inputmode="decimal" class="fxamt" value="${numFmt(fc.amount||0)}" onchange="editFC('${h}',${i},'amount',numParse(this.value))">
      <select onchange="editFC('${h}',${i},'mode',this.value)">
        <option value="monthly" ${fc.mode==='monthly'?'selected':''}>ทุกเดือน</option>
        <option value="provision" ${fc.mode==='provision'?'selected':''}>เฉลี่ย 12 เดือน</option>
@@ -904,7 +905,7 @@ function viewHotel(h){
   // debt items editor
   const diRows=(hotel.debtItems||[]).map((di,i)=>`<div class="fxrow">
      <input type="text" value="${(di.name||'').replace(/"/g,'&quot;')}" onchange="editDebtItem('${h}',${i},'name',this.value)">
-     <input type="text" inputmode="decimal" value="${numFmt(di.amount||0)}" onchange="editDebtItem('${h}',${i},'amount',numParse(this.value))">
+     <input type="text" inputmode="decimal" class="fxamt" value="${numFmt(di.amount||0)}" onchange="editDebtItem('${h}',${i},'amount',numParse(this.value))">
      <select onchange="editDebtItem('${h}',${i},'mode',this.value)">
        <option value="monthly" ${di.mode==='pinned'?'':'selected'}>ทุกเดือนทั้งปี</option>
        <option value="pinned" ${di.mode==='pinned'?'selected':''}>ระบุเดือนเดียว</option>
@@ -1505,6 +1506,12 @@ function viewBudget(){
   const nDrawn=flat.filter(x=>x.status==='drawn').length, nReady=flat.filter(x=>x.status==='ready').length, nPend=flat.filter(x=>x.status==='pending').length;
   const bankDrawn=b.draws.reduce((s,d)=>s+(+d.amount||0),0);
   const cap=+b.loanCap||0; const capLeft=cap-bankDrawn; const pct=cap>0?Math.min(100,Math.round(bankDrawn/cap*100)):0;
+  // ---- เงินกู้ที่เบิกแล้วถูกใครดึงไปใช้บ้าง (Owner/โรงแรม/ก่อสร้าง) — อิงจากรายการ "การใช้เงิน" ที่บันทึกไว้ในแท็บ "แบงก์ 70 ล้าน" ----
+  const bankUses=(state.consDetail && state.consDetail.bank && state.consDetail.bank.uses)||[];
+  const useByCat={owner:0,hotel:0,construction:0,other:0};
+  bankUses.forEach(u=>{ const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
+  const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
+  const bankUseUnavail=Math.max(0,bankDrawn-bankUseTotal); // ยังไม่ถูกดึงไปใช้ = ใช้ได้อยู่
 
   // ---- KPI ----
   const kpi=`<div class="kpi">
@@ -1530,6 +1537,14 @@ function viewBudget(){
     <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#fdf3dd;border:1px solid #c8901f"></span> เตรียมเบิก งวดถัดไป (${nReady})</span>
     <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:#fff;border:1px solid #cbc4b4"></span> ยังไม่เบิก (${nPend})</span>
   </div>`;
+
+  // ---- กราฟวงกลม: เงินกู้ที่เบิกแล้วถูกใครดึงไปใช้บ้าง ----
+  const bankUseChart=bankDrawn>0?`<div class="chartcard" style="margin:4px 0 18px">
+    <div class="ct">🥧 เงินกู้ที่เบิกแล้ว ${fmt(bankDrawn)} บาท — ใครดึงไปใช้เท่าไหร่</div>
+    <div class="cs">แบ่งตามผู้ใช้ที่บันทึกไว้ในตาราง "② การใช้เงิน" ของแท็บ "แบงก์ 70 ล้าน" · ส่วนที่เหลือ = ยังไม่ถูกดึงไปใช้ (ใช้ได้อยู่)</div>
+    <div class="cbox" style="height:270px"><canvas id="bankUseChart"></canvas></div>
+    ${bankUseTotal>bankDrawn?`<p class="hint" style="color:var(--neg)">⚠️ ยอดใช้เงินที่บันทึกไว้ (${fmt(bankUseTotal)}) มากกว่ายอดที่เบิกจริง (${fmt(bankDrawn)}) — ลองตรวจสอบรายการในแท็บ "แบงก์ 70 ล้าน" อีกครั้ง</p>`:''}
+  </div>`:'';
 
   // ---- ① สรุปการเบิกเป็นงวด ----
   const drawBody=b.draws.map((d,i)=>{
@@ -1611,6 +1626,7 @@ function viewBudget(){
     ${kpi}
     ${bar}
     ${legend}
+    ${bankUseChart}
     ${capBox}
     ${drawTable}
     ${bigTable}
@@ -2151,6 +2167,24 @@ function drawCharts(){
     if(document.getElementById('consCompareChart')){
       const srcTotal=srcData.reduce((a,b)=>a+b,0), useTotal=useData.reduce((a,b)=>a+b,0);
       charts.cc=new Chart(consCompareChart,{type:'bar',data:{labels:['แหล่งเงินรวม','ใช้ไปแล้ว','คงเหลือ'],datasets:[{data:[srcTotal,useTotal,srcTotal-useTotal],backgroundColor:['#243f66','#c0392b','#1b7a4b'],borderRadius:6,maxBarThickness:60}]},options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.parsed.x)+' บาท'}}},scales:{x:{grid:{color:CHART_GRID},ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}}});
+    }
+  }
+  if(currentTab==='construction' && consSub==='budget'){
+    const b=state.budget;
+    const bankDrawn=(b.draws||[]).reduce((s,d)=>s+(+d.amount||0),0);
+    const bankUses=(state.consDetail && state.consDetail.bank && state.consDetail.bank.uses)||[];
+    const useByCat={owner:0,hotel:0,construction:0,other:0};
+    bankUses.forEach(u=>{ const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
+    const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
+    const bankUseUnavail=Math.max(0,bankDrawn-bankUseTotal);
+    if(document.getElementById('bankUseChart')){
+      const CAT_LABEL2={owner:'Owner',hotel:'โรงแรม',construction:'ก่อสร้าง',other:'อื่นๆ/ไม่ระบุ'};
+      const CAT_COLOR2={owner:'#243f66',hotel:'#c8901f',construction:'#1b7a4b',other:'#8a857a'};
+      let labels=[],data=[],colors=[];
+      ['owner','hotel','construction','other'].forEach(cat=>{ if(useByCat[cat]>0){ labels.push(CAT_LABEL2[cat]); data.push(useByCat[cat]); colors.push(CAT_COLOR2[cat]); } });
+      if(bankUseUnavail>0){ labels.push('คงเหลือยังไม่ใช้ (ใช้ได้อยู่)'); data.push(bankUseUnavail); colors.push('#e4ddce'); }
+      if(data.some(x=>x>0))
+        charts.bu=new Chart(bankUseChart,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:pieOpt('เบิกแล้ว → ใครใช้ไปเท่าไหร่')});
     }
   }
   if(currentTab==='construction' && consSub!=='overview' && consSub!=='budget'){
