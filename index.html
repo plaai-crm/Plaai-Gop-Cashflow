@@ -1899,7 +1899,12 @@ function viewBudget(){
 // ---- setup ----
 const SETUP_SQL=`-- ===== PLAAI: ตารางข้อมูล + ระบบความปลอดภัย (v2) — รันซ้ำได้ ข้อมูลไม่หาย =====
 -- ⚠️ เวอร์ชันนี้ "ปิดการอ่านข้อมูลโดยไม่ล็อกอิน" — ต้องรันทั้งก้อนแล้วใช้ index.html เวอร์ชันใหม่คู่กัน
-create extension if not exists pgcrypto;
+-- pgcrypto: Supabase รุ่นใหม่ติดตั้งไว้ใน schema "extensions" (รุ่นเก่าอยู่ใน "public")
+-- จึงต้องใส่ทั้งสอง schema ไว้ใน search_path ของทุกฟังก์ชันด้านล่าง ไม่งั้นจะขึ้น error ว่าไม่รู้จัก crypt()
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+-- ตั้ง search_path ของ session นี้ด้วย เพื่อให้คำสั่ง insert ด้านล่างเรียก crypt() ได้
+set search_path = public, extensions;
 
 -- 1) ตารางเก็บข้อมูลกระแสเงินสด
 create table if not exists plaai_state (
@@ -1944,7 +1949,7 @@ on conflict (id) do nothing;
 -- 3) ตรวจ PIN ตอนเข้าสู่ระบบ
 create or replace function plaai_verify_login(p_user_id text, p_pin text)
 returns table(role text, name text)
-language sql security definer set search_path=public as $$
+language sql security definer set search_path=public, extensions as $$
   select u.role, u.name from plaai_users u
   where u.id=p_user_id and u.pin_hash=crypt(p_pin,u.pin_hash);
 $$;
@@ -1952,7 +1957,7 @@ $$;
 -- 4) 🔒 ใหม่: อ่านข้อมูล — ต้องส่ง PIN ที่ถูกต้องเท่านั้นถึงจะได้ข้อมูลกลับไป
 create or replace function plaai_load_state(p_user_id text, p_pin text)
 returns table(payload text, updated_at bigint)
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public, extensions as $$
 begin
   if not exists (select 1 from plaai_users where id=p_user_id and pin_hash=crypt(p_pin,pin_hash)) then
     raise exception 'unauthorized';
@@ -1963,7 +1968,7 @@ end $$;
 -- 5) 🔒 ใหม่: เช็คว่ามีข้อมูลใหม่หรือยัง (เบามาก ใช้แทน realtime)
 create or replace function plaai_state_version(p_user_id text, p_pin text)
 returns bigint
-language plpgsql security definer set search_path=public as $$
+language plpgsql security definer set search_path=public, extensions as $$
 declare v bigint;
 begin
   if not exists (select 1 from plaai_users where id=p_user_id and pin_hash=crypt(p_pin,pin_hash)) then
@@ -1976,7 +1981,7 @@ end $$;
 -- 6) บันทึกข้อมูล — ตรวจ PIN + สิทธิ์ + กันบันทึกทับงานคนอื่น (optimistic lock)
 --    p_base = เวลาบันทึกล่าสุดที่ผู้ใช้คนนี้เห็นตอนโหลด · ส่ง null = บังคับบันทึกทับ
 create or replace function plaai_save_state(p_user_id text, p_pin text, p_payload text, p_updated bigint, p_base bigint default null)
-returns bigint language plpgsql security definer set search_path=public as $$
+returns bigint language plpgsql security definer set search_path=public, extensions as $$
 declare cur bigint; newts bigint;
 begin
   if not exists (
@@ -1999,7 +2004,7 @@ end $$;
 
 -- 7) 🔑 ใหม่: เจ้าของกิจการเปลี่ยน PIN ของผู้ใช้บนเซิร์ฟเวอร์ได้จากในแอป
 create or replace function plaai_admin_set_pin(p_admin_id text, p_admin_pin text, p_target_id text, p_new_pin text)
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if not exists (select 1 from plaai_users where id=p_admin_id and pin_hash=crypt(p_admin_pin,pin_hash) and role='owner') then
     raise exception 'unauthorized';
@@ -2011,7 +2016,7 @@ end $$;
 
 -- 8) 👤 ใหม่: เจ้าของกิจการเพิ่ม/แก้บัญชีผู้จัดการจากในแอป (ให้ล็อกอินได้ทุกเครื่อง)
 create or replace function plaai_admin_upsert_user(p_admin_id text, p_admin_pin text, p_id text, p_name text, p_role text, p_pin text, p_tabs text)
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if not exists (select 1 from plaai_users where id=p_admin_id and pin_hash=crypt(p_admin_pin,pin_hash) and role='owner') then
     raise exception 'unauthorized';
@@ -2025,7 +2030,7 @@ end $$;
 
 -- 9) 🗑️ ใหม่: ลบบัญชีผู้จัดการ (ลบบัญชีตั้งต้น 6 บัญชีไม่ได้)
 create or replace function plaai_admin_delete_user(p_admin_id text, p_admin_pin text, p_id text)
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if not exists (select 1 from plaai_users where id=p_admin_id and pin_hash=crypt(p_admin_pin,pin_hash) and role='owner') then
     raise exception 'unauthorized';
@@ -2045,8 +2050,13 @@ grant execute on function plaai_admin_set_pin(text,text,text,text) to anon, auth
 grant execute on function plaai_admin_upsert_user(text,text,text,text,text,text,text) to anon, authenticated;
 grant execute on function plaai_admin_delete_user(text,text,text) to anon, authenticated;
 
--- ตรวจผลลัพธ์: คำสั่งนี้ต้องขึ้น error 'permission denied' = ปิดช่องโหว่สำเร็จ
---   select * from plaai_state;   (รันในฐานะ anon)`;
+-- ===== ตรวจผลหลังรันเสร็จ (คัดลอกไปรันแยกได้) =====
+-- 1) ต้องได้ 1 แถว = ฟังก์ชันตรวจ PIN ทำงานได้ (เปลี่ยน 1111 เป็น PIN จริงของ owner)
+--    select * from plaai_verify_login('owner','1111');
+-- 2) ต้องได้ข้อมูลกลับมา = แอปอ่านข้อมูลได้
+--    select left(payload,60), updated_at from plaai_load_state('owner','1111');
+-- 3) ต้องขึ้น error 'unauthorized' = คนที่ไม่มี PIN ดึงข้อมูลไม่ได้
+--    select * from plaai_load_state('owner','9999');`;
 // แปลงอักขระพิเศษให้ปลอดภัยทั้งใน "เนื้อหา" และใน "ค่า attribute" — กันชื่อที่มี < > & " ทำหน้าเพี้ยน/ฝังสคริปต์
 function escHtml(s){return (s==null?'':(''+s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');}
 // ---- แผงจัดการ PIN สำหรับเจ้าของกิจการ (เปลี่ยน PIN ของทุกคนได้ในแอป) ----
