@@ -353,6 +353,28 @@ const CONS_DETAIL_SEED={
 };
 const CONS_KEYS=['bank','bowin1','owner'];
 
+// ---------- Forecast รายการจ่ายโครงการบ่อวิน 2 (ยอดคาดการณ์ — ไม่เชื่อมกับยอดอื่นในระบบ) ----------
+// ข้อมูลจริงจากชีตค่าใช้จ่ายประจำเดือน ส.ค.26 และ ก.ย.26 ที่ Rada ให้มา
+const CONS_FORECAST_SEED=[
+  {id:'cf1',month:'2026-08',date:'2026-08-12',item:'ค่าเช่าพื้นที่-เพลินการ์เด้น',amount:200000,note:''},
+  {id:'cf2',month:'2026-08',date:'2026-08-12',item:'เงินกู้ 1 ล้าน คุ้มครองเครดิต',amount:31000,note:''},
+  {id:'cf3',month:'2026-08',date:'2026-08-12',item:'ดอกเบี้ยเงินกู้ 70 ล้าน (คิดตามยอดที่เบิก) 10,000,000+8,025,000',amount:76606.25,note:''},
+  {id:'cf4',month:'2026-08',date:'2026-08-15',item:'กรมสรรพากร ภงด 3 และ 53',amount:128470,note:''},
+  {id:'cf5',month:'2026-08',date:'2026-08-31',item:'ที่ปรึกษา โครงการพลายพลัสบ่อวิน2-คุณปิยชัย (เม.ย-มิ.ย)',amount:309000,note:''},
+  {id:'cf6',month:'2026-08',date:'2026-08-31',item:'ที่ปรึกษา งานระบบไฟฟ้า ระบบสุขาภิบาล และระบบปรับอากาศ-คุณชาติชาย',amount:30000,note:''},
+  {id:'cf7',month:'2026-08',date:'2026-08-31',item:'Project manager-คุณภิรมณ',amount:10000,note:''},
+  {id:'cf8',month:'2026-08',date:'2026-08-31',item:'ค่าก่อสร้างทรัพย์ในแผ่นดินงวดงานที่ 9',amount:3703896.10,note:''},
+  {id:'cf9',month:'2026-08',date:'2026-08-31',item:'ค่ามัดจำ 20% ลิฟท์ (ยอดเต็ม 1,177,000)',amount:235400,note:''},
+  {id:'cf10',month:'2026-09',date:'',item:'ค่าเช่าพื้นที่-เพลินการ์เด้น',amount:200000,note:''},
+  {id:'cf11',month:'2026-09',date:'',item:'เงินกู้ 1 ล้าน คุ้มครองเครดิต',amount:31000,note:''},
+  {id:'cf12',month:'2026-09',date:'',item:'ดอกเบี้ยเงินกู้ 70 ล้าน (คิดตามยอดที่เบิก) 10,000,000+8,025,000+7,704,000',amount:109348.25,note:''},
+  {id:'cf13',month:'2026-09',date:'',item:'ที่ปรึกษา โครงการพลายพลัสบ่อวิน2-คุณปิยชัย',amount:103000,note:''},
+  {id:'cf14',month:'2026-09',date:'',item:'ที่ปรึกษา งานระบบไฟฟ้า ระบบสุขาภิบาล และระบบปรับอากาศ-คุณชาติชาย',amount:30000,note:''},
+  {id:'cf15',month:'2026-09',date:'',item:'Project manager-คุณภิรมณ',amount:10000,note:''},
+  {id:'cf16',month:'2026-09',date:'',item:'ค่าแผ่นผนังคิวคอนชั้น1',amount:390116.44,note:''}
+];
+const MONTH_TH_FULL={jan:'มกราคม',feb:'กุมภาพันธ์',mar:'มีนาคม',apr:'เมษายน',may:'พฤษภาคม',jun:'มิถุนายน',jul:'กรกฎาคม',aug:'สิงหาคม',sep:'กันยายน',oct:'ตุลาคม',nov:'พฤศจิกายน',dec:'ธันวาคม'};
+
 // ---------- งบลงทุนรายละเอียด (บ่อวิน 2) : ข้อมูลจริงจากไฟล์ "รายละเอียดงบลงทุน ส่งลูกค้า.xlsx" ----------
 // สถานะรายการ: 'drawn'=เบิกแล้ว · 'ready'=เตรียมเบิก(งวดถัดไป) · 'pending'=ยังไม่เบิก
 // drawNo = อยู่ในงวดที่เท่าไหร่ (null = ยังไม่จัดงวด) · value=มูลค่างานรวม VAT · loan=ยอดเบิกกู้ได้ 50%
@@ -457,6 +479,9 @@ function fmt(n){ if(n===null||n===undefined||isNaN(n)) return '–'; return Math
 function fmt0(n){ return (n<0?'-':'')+Math.abs(Math.round(n)).toLocaleString('en-US'); }
 // numFmt: สำหรับใส่ใน value ของ <input> ตัวเลขที่แก้ไขได้ — ใส่ลูกน้ำคั่นหลักพัน แต่ไม่ปัดเศษทศนิยม (ต่างจาก fmt() ที่ปัดเป็นจำนวนเต็มสำหรับแสดงผลอย่างเดียว)
 function numFmt(v){ const n=numParse(v); if(!isFinite(n)) return '0'; return n.toLocaleString('en-US',{maximumFractionDigits:6}); }
+// รวมยอดรายเดือนจาก array ของรายการ โดยอิงจากฟิลด์วันที่/เดือน (รับได้ทั้ง 'YYYY-MM' และ 'YYYY-MM-DD') → คืนเป็น {'YYYY-MM': ยอดรวม}
+function monthlyTotals(items,dateField,amtField){ const m={}; (items||[]).forEach(it=>{ const d=it[dateField]; if(!d) return; const key=(''+d).slice(0,7); if(key.length<7) return; m[key]=(m[key]||0)+(+it[amtField]||0); }); return m; }
+function monthKeyLabel(key){ const [y,m]=key.split('-'); return MONTH_TH_FULL[MONTHS[parseInt(m)-1]]+' '+y; }
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
 function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 
@@ -525,6 +550,14 @@ function migrate(){
       if(u.repayDate===undefined) u.repayDate='';
       if(u.repaid===undefined) u.repaid=false;
     });
+  });
+  // ---- โมดูลใหม่: Forecast รายการจ่ายโครงการบ่อวิน 2 (ยอดคาดการณ์เท่านั้น ไม่เชื่อมกับยอดอื่น) ----
+  if(!Array.isArray(state.consForecast)) state.consForecast=JSON.parse(JSON.stringify(CONS_FORECAST_SEED));
+  state.consForecast.forEach(it=>{
+    if(!it.id) it.id='cf'+Math.random().toString(36).slice(2,9);
+    if(it.month===undefined) it.month=(it.date?it.date.slice(0,7):'');
+    if(it.date===undefined) it.date='';
+    if(it.note===undefined) it.note='';
   });
   // ---- โมดูลใหม่: งบลงทุนรายละเอียด บ่อวิน 2 (แยกงวด/สถานะ/สี) ----
   if(!state.budget || typeof state.budget!=='object') state.budget=JSON.parse(JSON.stringify(BUDGET_SEED));
@@ -785,7 +818,7 @@ function showTab(t){ if(!tabAllowed(t)){toast('🔒 บัญชีนี้ไ�
 function render(){
   if(!tabAllowed(currentTab)) currentTab=firstAllowedTab();
   const m=document.getElementById('main');
-  if(currentTab==='construction') m.innerHTML=(consSub==='overview')?viewConstruction():(consSub==='budget')?viewBudget():viewConsDetail(consSub);
+  if(currentTab==='construction') m.innerHTML=(consSub==='overview')?viewConstruction():(consSub==='budget')?viewBudget():(consSub==='forecast')?viewConsForecast():viewConsDetail(consSub);
   else if(currentTab==='cash') m.innerHTML=viewCash();
   else if(currentTab==='financing') m.innerHTML=viewFinancing();
   else if(currentTab==='combined') m.innerHTML=viewCombined();
@@ -1374,7 +1407,7 @@ function viewFinancing(){
 // ===========  หน้า: เงินก่อสร้าง (รายละเอียด 3 แหล่ง)  ======
 // ============================================================
 function consSubNav(){
-  const tabs=[['overview','ภาพรวม'],['budget','📋 งบลงทุน บ่อวิน 2'],['bank','แบงก์ 70 ล้าน'],['bowin1','เงินยืมบ่อวิน 1'],['owner','เงินยืม Owner']];
+  const tabs=[['overview','ภาพรวม'],['budget','📋 งบลงทุน บ่อวิน 2'],['bank','แบงก์ 70 ล้าน'],['forecast','📅 Forecast รายจ่าย'],['bowin1','เงินยืมบ่อวิน 1'],['owner','เงินยืม Owner']];
   return `<div class="yrtabs" style="margin-bottom:16px">${tabs.map(t=>`<button class="${consSub===t[0]?'active':''}" onclick="setConsSub('${t[0]}')">${t[1]}</button>`).join('')}</div>`;
 }
 function viewConsDetail(key){
@@ -1463,6 +1496,16 @@ function viewConsDetail(key){
       <div class="cbox" style="height:270px"><canvas id="bankCatChart"></canvas></div>
       ${bankUseTotal>drawn?`<p class="hint" style="color:var(--neg)">⚠️ ยอดใช้เงินที่บันทึกไว้ (${fmt(bankUseTotal)}) มากกว่ายอดที่เบิกจริง (${fmt(drawn)}) — ลองตรวจสอบรายการด้านล่างอีกครั้ง</p>`:''}
     </div>`:''}
+    ${isBank?`<div class="chartcard" style="margin-top:6px">
+        <div class="ct">📊 รายจ่ายรายเดือน — ยอดคาดการณ์</div>
+        <div class="cs">จากหน้า "📅 Forecast รายจ่าย" ของโครงการบ่อวิน 2</div>
+        <div class="cbox" style="height:230px"><canvas id="fcForecastBarChart"></canvas></div>
+      </div>
+      <div class="chartcard" style="margin-top:12px">
+        <div class="ct">📊 รายจ่ายรายเดือน — ยอดจ่ายจริง</div>
+        <div class="cs">รวมจากตาราง "② การใช้เงิน" ด้านล่าง (ตามวันที่ที่บันทึกไว้) · เดือนตรงกับกราฟด้านบนเพื่อเทียบกันง่ายๆ</div>
+        <div class="cbox" style="height:230px"><canvas id="fcActualBarChart"></canvas></div>
+      </div>`:''}
     <details class="collapsible edit-only" open>
       <summary>📋 รายละเอียดการเบิก &amp; การใช้เงิน (คลิกเพื่อซ่อน/แสดง) <span class="cnt">${nTx} รายการ</span></summary>
       <h3 style="font-size:15px;margin:6px 0 8px">① การเบิก / รับเงินเข้า (แต่ละงวด)</h3>
@@ -1480,6 +1523,69 @@ function viewConsDetail(key){
       </table></div>
       <button class="mini primary" style="margin-top:10px" onclick="addConsUse('${key}')">➕ เพิ่มรายการใช้เงิน</button>
     </details>
+  </div>`;
+}
+
+// ============================================================
+// ===========  หน้า: Forecast รายการจ่ายโครงการบ่อวิน 2  ======
+// ============================================================
+// หมายเหตุ: หน้านี้เป็นแค่ "ยอดคาดการณ์" สำหรับดูรายเดือน — ไม่ดึงไปรวมกับยอดเงินสด/งบลงทุน/แบงก์ที่อื่นในระบบ
+function viewConsForecast(){
+  const items=state.consForecast||[];
+  const canEd=canEdit;
+  // จัดกลุ่มตามเดือน (YYYY-MM) เรียงตามเวลา · รายการที่ยังไม่ระบุเดือนไปอยู่ท้ายสุด
+  const byMonth={};
+  items.forEach(it=>{ const key=it.month||'_none'; (byMonth[key]=byMonth[key]||[]).push(it); });
+  const monthKeys=Object.keys(byMonth).filter(k=>k!=='_none').sort();
+  if(byMonth['_none']) monthKeys.push('_none');
+  const grandTotal=items.reduce((s,it)=>s+(+it.amount||0),0);
+  const monthLabel=(key)=>{ if(key==='_none') return 'ยังไม่ระบุเดือน';
+    const [y,m]=key.split('-'); return MONTH_TH_FULL[MONTHS[parseInt(m)-1]]+' '+y; };
+  const rowHtml=(it)=>{
+    return `<tr>
+      <td><input class="cell" type="date" style="width:130px" value="${it.date||''}" onchange="editConsForecastById('${it.id}','date',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:340px;text-align:left" value="${(it.item||'').replace(/"/g,'&quot;')}" placeholder="รายการจ่าย" onchange="editConsForecastById('${it.id}','item',this.value)"></td>
+      <td><input class="cell" style="width:120px" value="${numFmt(it.amount||0)}" onchange="editConsForecastById('${it.id}','amount',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:150px;text-align:left" value="${(it.note||'').replace(/"/g,'&quot;')}" placeholder="หมายเหตุ" onchange="editConsForecastById('${it.id}','note',this.value)"></td>
+      <td><button class="mini danger" onclick="delConsForecastById('${it.id}')">ลบ</button></td></tr>`;
+  };
+  const monthBlocks=monthKeys.length? monthKeys.map(key=>{
+      const rows=byMonth[key];
+      const subtotal=rows.reduce((s,it)=>s+(+it.amount||0),0);
+      const monthInputVal=key==='_none'?'':key;
+      return `<div style="margin-bottom:22px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+          <h3 style="font-size:15px;margin:0">🗓️ ${monthLabel(key)} <span style="color:var(--muted);font-weight:500">· ${rows.length} รายการ</span></h3>
+          <div style="font-size:14px">รวม: <b style="color:var(--neg)">${fmt(subtotal)}</b> บาท</div>
+        </div>
+        <div class="tblwrap"><table>
+          <thead><tr><th>วันที่จ่าย</th><th style="text-align:left">รายการ</th><th>ยอด</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
+          <tbody>${rows.map(rowHtml).join('')}<tr class="total"><td colspan="2">รวม ${monthLabel(key)}</td><td>${fmt(subtotal)}</td><td colspan="2"></td></tr></tbody>
+        </table></div>
+        ${canEd?`<div class="fxrow" style="margin-top:8px">
+          <input type="month" id="fcNewMonth_${key}" value="${monthInputVal}" style="flex:0 0 auto">
+          <button class="mini primary" onclick="addConsForecast(document.getElementById('fcNewMonth_${key}').value||'${monthInputVal}')">➕ เพิ่มรายการในเดือนนี้</button>
+        </div>`:''}
+      </div>`;
+    }).join('')
+    : `<p class="hint" style="text-align:center;padding:20px">ยังไม่มีรายการ — กด "➕ เพิ่มรายการใหม่" ด้านล่าง</p>`;
+  return `<div class="card">
+    ${consSubNav()}
+    <h2>📅 Forecast รายการจ่ายโครงการบ่อวิน 2</h2>
+    <p class="hint">⚠️ หน้านี้เป็น<b>ยอดคาดการณ์ (ประมาณการ)</b> สำหรับดูภาพรวมรายจ่ายแต่ละเดือนเท่านั้น — <b>ไม่ถูกนำไปรวมกับยอดเงินสด งบลงทุน หรือยอดเบิกแบงก์ที่อื่นในระบบ</b> · ระบุวันที่จ่ายจริงได้ทีละรายการ ระบบจะจัดกลุ่มเป็นรายเดือนให้อัตโนมัติ</p>
+    <div class="kpi">
+      <div class="box" style="border-left-color:var(--navy2)"><div class="lbl">รวมยอดคาดการณ์ทั้งหมด</div><div class="val">${fmt(grandTotal)}</div><div class="cap">บาท · ${items.length} รายการ · ${monthKeys.length} เดือน</div></div>
+    </div>
+    ${monthKeys.filter(k=>k!=='_none').length?`<div class="chartcard" style="margin-bottom:18px">
+      <div class="ct">📊 สรุปยอดคาดการณ์รายเดือน</div>
+      <div class="cs">แต่ละแท่ง = ยอดรวมของเดือนนั้น (จะเพิ่มแท่งให้เองอัตโนมัติเมื่อมีรายการเดือนใหม่)</div>
+      <div class="cbox" style="height:250px"><canvas id="fcSummaryBarChart"></canvas></div>
+    </div>`:''}
+    ${monthBlocks}
+    ${canEd?`<div class="fxrow" style="margin-top:6px;border-top:1px solid var(--line);padding-top:16px">
+      <input type="month" id="fcNewMonthTop">
+      <button class="mini primary" onclick="addConsForecast(document.getElementById('fcNewMonthTop').value)">➕ เพิ่มรายการใหม่ (เลือกเดือนก่อน)</button>
+    </div>`:''}
   </div>`;
 }
 
@@ -2071,6 +2177,10 @@ function delConsDraw(key,i){ if(ro())return; state.consDetail[key].draws.splice(
 function addConsUse(key){ if(ro())return; state.consDetail[key].uses.push({id:'us'+Date.now(),date:'',item:'',amount:0,note:'',srcDraw:'',category:'',repayDate:'',repaid:false}); save(); render(); }
 function editConsUse(key,i,field,val){ if(ro())return; const u=state.consDetail[key].uses[i]; if(!u)return; u[field]=(field==='amount')?numParse(val):(field==='repaid'?!!val:val); save(); render(); }
 function delConsUse(key,i){ if(ro())return; state.consDetail[key].uses.splice(i,1); save(); render(); }
+// ---- Forecast รายการจ่ายโครงการบ่อวิน 2 (ยอดคาดการณ์เท่านั้น) ----
+function addConsForecast(month){ if(ro())return; state.consForecast.push({id:'cf'+Date.now(),month:month||'',date:'',item:'',amount:0,note:''}); save(); render(); }
+function editConsForecastById(id,field,val){ if(ro())return; const it=state.consForecast.find(x=>x.id===id); if(!it)return; it[field]=(field==='amount')?numParse(val):val; save(); render(); }
+function delConsForecastById(id){ if(ro())return; const idx=state.consForecast.findIndex(x=>x.id===id); if(idx>=0){ state.consForecast.splice(idx,1); save(); render(); } }
 
 function exportJSON(){const b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='plaai_hotel_data.json';a.click();}
 function importJSON(inp){if(ro())return;const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{state=JSON.parse(e.target.result);migrate();save();render();toast('นำเข้าข้อมูลแล้ว');}catch(err){toast('ไฟล์ไม่ถูกต้อง');}};r.readAsText(f);}
@@ -2134,6 +2244,11 @@ if(window.Chart){
   Chart.defaults.plugins.tooltip.cornerRadius=8;
   Chart.defaults.plugins.tooltip.titleFont={weight:'700'};
   Chart.defaults.plugins.tooltip.boxPadding=5;
+  // ธีมพรีเมียมสำหรับผู้บริหาร: แท่งมุมโค้งเนียนทุกกราฟ + เส้นกริดแนวตั้งซ่อน (เหลือแต่เส้นแนวนอนบางๆ) ให้ดูสะอาดตาเป็นมาตรฐานเดียวกัน
+  Chart.defaults.elements.bar.borderRadius=8;
+  Chart.defaults.elements.bar.borderSkipped=false;
+  Chart.defaults.scales.category.grid={display:false};
+  Chart.defaults.scales.linear.grid={color:CHART_GRID,drawTicks:false};
 }
 // สร้าง dataset ของ "กราฟเงินก่อสร้าง 3 แหล่ง" — cumulative เบิก vs ใช้ + เงินคงเหลือในมือ ตามวันที่
 function consDetailChartData(s){
@@ -2156,16 +2271,22 @@ function drawCharts(){
     const srcData=c.sources.map(s=>Math.max(0,+s.amount||0));
     const useData=c.uses.map(u=>Math.max(0,+u.amount||0));
     if(document.getElementById('srcPie')&&srcData.some(x=>x>0))
-      charts.s=new Chart(srcPie,{type:'doughnut',data:{labels:c.sources.map(s=>s.name),datasets:[{data:srcData,backgroundColor:['#243f66','#b28e4c','#1b7a4b'],borderWidth:2,borderColor:'#fff'}]},options:pieOpt('แหล่งเงิน')});
+      charts.s=new Chart(srcPie,{type:'doughnut',data:{labels:c.sources.map(s=>s.name),datasets:[{data:srcData,backgroundColor:['#243f66','#b28e4c','#1b7a4b'],borderWidth:2,borderColor:'#fff'}]},plugins:[pieValueLabelPlugin],options:pieOpt('แหล่งเงิน')});
     if(document.getElementById('usePie')&&useData.some(x=>x>0))
-      charts.u=new Chart(usePie,{type:'doughnut',data:{labels:c.uses.map(u=>u.name),datasets:[{data:useData,backgroundColor:CONS_PALETTE,borderWidth:2,borderColor:'#fff'}]},options:pieOpt('การใช้เงิน')});
+      charts.u=new Chart(usePie,{type:'doughnut',data:{labels:c.uses.map(u=>u.name),datasets:[{data:useData,backgroundColor:CONS_PALETTE,borderWidth:2,borderColor:'#fff'}]},plugins:[pieValueLabelPlugin],options:pieOpt('การใช้เงิน')});
     // แท่งเปรียบเทียบ แหล่งเงิน vs ใช้ไป vs คงเหลือ
     if(document.getElementById('consCompareChart')){
       const srcTotal=srcData.reduce((a,b)=>a+b,0), useTotal=useData.reduce((a,b)=>a+b,0);
-      charts.cc=new Chart(consCompareChart,{type:'bar',data:{labels:['แหล่งเงินรวม','ใช้ไปแล้ว','คงเหลือ'],datasets:[{data:[srcTotal,useTotal,srcTotal-useTotal],backgroundColor:['#243f66','#c0392b','#1b7a4b'],borderRadius:6,maxBarThickness:60}]},options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.parsed.x)+' บาท'}}},scales:{x:{grid:{color:CHART_GRID},ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}}});
+      charts.cc=new Chart(consCompareChart,{type:'bar',data:{labels:['แหล่งเงินรวม','ใช้ไปแล้ว','คงเหลือ'],datasets:[{data:[srcTotal,useTotal,srcTotal-useTotal],backgroundColor:['#243f66','#c0392b','#1b7a4b'],maxBarThickness:60}]},plugins:[barValueLabelPlugin],options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{grace:'15%',grid:{color:CHART_GRID},ticks:{callback:v=>fmt(v)}},y:{grid:{display:false}}}}});
     }
   }
-  if(currentTab==='construction' && consSub!=='overview' && consSub!=='budget'){
+  if(currentTab==='construction' && consSub==='forecast'){
+    const fcTotals=monthlyTotals(state.consForecast,'month','amount');
+    const months=Object.keys(fcTotals).sort();
+    if(document.getElementById('fcSummaryBarChart') && months.length)
+      charts.fcs=new Chart(fcSummaryBarChart,{type:'bar',data:{labels:months.map(monthKeyLabel),datasets:[{label:'คาดการณ์',data:months.map(k=>fcTotals[k]),backgroundColor:'#c8901f'}]},plugins:[barValueLabelPlugin],options:{layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{y:{grace:'15%',ticks:{callback:v=>fmt(v)}}}}});
+  }
+  if(currentTab==='construction' && consSub!=='overview' && consSub!=='budget' && consSub!=='forecast'){
     const s=state.consDetail[consSub];
     const drawn=(s.draws||[]).reduce((a,d)=>a+(+d.amount||0),0);
     const used=(s.uses||[]).reduce((a,u)=>a+(+u.amount||0),0);
@@ -2182,7 +2303,17 @@ function drawCharts(){
       ['owner','hotel','construction','other'].forEach(cat=>{ if(useByCat[cat]>0){ labels.push(CAT_LABEL2[cat]); data.push(useByCat[cat]); colors.push(CAT_COLOR2[cat]); } });
       if(bankUseUnavail>0){ labels.push('คงเหลือยังไม่ใช้ (ใช้ได้อยู่)'); data.push(bankUseUnavail); colors.push('#e4ddce'); }
       if(data.some(x=>x>0))
-        charts.bu=new Chart(bankCatChart,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:pieOpt('เบิกแล้ว → ใครใช้ไปเท่าไหร่')});
+        charts.bu=new Chart(bankCatChart,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},plugins:[pieValueLabelPlugin],options:pieOpt('เบิกแล้ว → ใครใช้ไปเท่าไหร่')}); // ใช้ tooltip:false ร่วมกับ pieOpt เพราะมีตัวเลขกำกับติดกราฟอยู่แล้ว
+    }
+    // แท่งรายเดือน: คาดการณ์ (จากหน้า Forecast) vs จ่ายจริง (จากตาราง "② การใช้เงิน" ของแบงก์ 70 ล้าน)
+    if(consSub==='bank'){
+      const fcTotals=monthlyTotals(state.consForecast,'month','amount');
+      const actTotals=monthlyTotals(s.uses,'date','amount');
+      const allMonths=Array.from(new Set([...Object.keys(fcTotals),...Object.keys(actTotals)])).sort();
+      if(document.getElementById('fcForecastBarChart') && allMonths.length)
+        charts.fcf=new Chart(fcForecastBarChart,{type:'bar',data:{labels:allMonths.map(monthKeyLabel),datasets:[{label:'คาดการณ์',data:allMonths.map(k=>fcTotals[k]||0),backgroundColor:'#c8901f'}]},plugins:[barValueLabelPlugin],options:{layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{y:{grace:'15%',ticks:{callback:v=>fmt(v)}}}}});
+      if(document.getElementById('fcActualBarChart') && allMonths.length)
+        charts.fca=new Chart(fcActualBarChart,{type:'bar',data:{labels:allMonths.map(monthKeyLabel),datasets:[{label:'จ่ายจริง',data:allMonths.map(k=>actTotals[k]||0),backgroundColor:'#1b7a4b'}]},plugins:[barValueLabelPlugin],options:{layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{y:{grace:'15%',ticks:{callback:v=>fmt(v)}}}}});
     }
     if(document.getElementById('consFlowChart') && cd){
       charts.cf=new Chart(consFlowChart,{data:{labels:cd.labels,datasets:[
@@ -2196,7 +2327,7 @@ function drawCharts(){
       if(credit>0){ labels=['เบิกแล้ว','วงเงินคงเหลือ (ยังเบิกได้)']; data=[Math.min(drawn,credit),Math.max(0,credit-drawn)]; colors=['#243f66','#e4ddce']; }
       else { labels=['ใช้จ่ายไปแล้ว','เงินคงเหลือในมือ']; data=[used,Math.max(0,drawn-used)]; colors=['#c0392b','#1b7a4b']; }
       if(data.some(x=>x>0))
-        charts.cu=new Chart(consUtilChart,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:{cutout:'66%',plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)+' บาท'}}}}});
+        charts.cu=new Chart(consUtilChart,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},plugins:[pieValueLabelPlugin],options:{cutout:'66%',plugins:{legend:{position:'bottom'},tooltip:{enabled:false}}}});
     }
   }
   if(currentTab==='financing'){
@@ -2218,10 +2349,10 @@ function drawCharts(){
     const active=HOTEL_ORDER.filter(h=>!(state.hotels[h].underConstruction&&!hasData(h,yr)));
     const net=MONTHS.map(mo=>active.reduce((s,h)=>s+netCF(h,yr,mo),0));
     if(document.getElementById('combChart'))
-      charts.c=new Chart(combChart,{type:'bar',data:{labels:MONTHS.map(m=>MONTH_TH[m]),datasets:[{label:'เงินสดสุทธิรวม',data:net,backgroundColor:net.map(v=>v>=0?'#1b7a4b':'#c0392b')}]},options:barOpt()});
+      charts.c=new Chart(combChart,{type:'bar',data:{labels:MONTHS.map(m=>MONTH_TH[m]),datasets:[{label:'เงินสดสุทธิรวม',data:net,backgroundColor:net.map(v=>v>=0?'#1b7a4b':'#c0392b')}]},plugins:[barValueLabelPlugin],options:barOpt()});
     const annual=HOTEL_ORDER.map(h=>MONTHS.reduce((s,mo)=>s+netCF(h,yr,mo),0));
     if(document.getElementById('hotelBar'))
-      charts.hb=new Chart(hotelBar,{type:'bar',data:{labels:HOTEL_ORDER.map(h=>state.hotels[h].name),datasets:[{label:'เงินสดสุทธิ',data:annual,backgroundColor:HOTEL_ORDER.map(h=>state.hotels[h].color)}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>fmt(v)}}}}});
+      charts.hb=new Chart(hotelBar,{type:'bar',data:{labels:HOTEL_ORDER.map(h=>state.hotels[h].name),datasets:[{label:'เงินสดสุทธิ',data:annual,backgroundColor:HOTEL_ORDER.map(h=>state.hotels[h].color)}]},plugins:[barValueLabelPlugin],options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{grace:'15%',ticks:{callback:v=>fmt(v)}}}}});
   }
   if(state.hotels[currentTab]){
     const h=currentTab,yr=currentYear[h]||'2026';
@@ -2231,11 +2362,47 @@ function drawCharts(){
       charts.h=new Chart(hotelChart,{type:'bar',data:{labels:MONTHS.map(m=>MONTH_TH[m]),datasets:[
         {label:'GOP',data:gop,backgroundColor:'#c9b487'},
         {type:'line',label:'เงินสดสุทธิ',data:net,borderColor:'#c0392b',backgroundColor:'#c0392b',tension:.3}
-      ]},options:barOpt()});
+      ]},plugins:[barValueLabelPlugin],options:barOpt()});
   }
 }
-function pieOpt(t){return{cutout:'60%',plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:10,padding:12}},title:{display:true,text:t,font:{size:13,weight:'700'},color:'#16233d',padding:{bottom:8}},tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.parsed)+' บาท'}}}};}
-function barOpt(){return{plugins:{legend:{display:true,position:'top'}},scales:{y:{ticks:{callback:v=>fmt(v)}}}};}
+// หมายเหตุ: กราฟที่มีตัวเลขค่ากำกับติดอยู่บนกราฟแล้ว (barValueLabelPlugin / pieValueLabelPlugin) จะปิด tooltip เพื่อไม่ให้แสดงตัวเลขซ้ำซ้อนตอนชี้เมาส์ — เลือกวิธีแสดงผลแบบเดียวต่อกราฟ ให้ดูสะอาดตา
+function pieOpt(t){return{cutout:'60%',layout:{padding:8},plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:10,padding:12}},title:{display:true,text:t,font:{size:13,weight:'700'},color:'#16233d',padding:{bottom:8}},tooltip:{enabled:false}}};}
+function barOpt(){return{layout:{padding:{top:22}},plugins:{legend:{display:true,position:'top'},tooltip:{enabled:false}},scales:{y:{grace:'12%',ticks:{callback:v=>fmt(v)}}}};}
+// ปลั๊กอินเล็กๆ วาดตัวเลขยอดบนกราฟแท่งโดยตรง (ไม่ต้องเอาเมาส์ไปชี้) — ไม่พึ่ง CDN เพิ่ม ใช้ Chart.js core API วาดเอง
+// รองรับทั้งแท่งตั้ง/แท่งนอน (indexAxis:'y') และค่าติดลบ · ข้ามชุดข้อมูลที่เป็นเส้น (type:'line') ในกราฟผสม เพื่อไม่ให้รก
+const barValueLabelPlugin={id:'barValueLabel',afterDatasetsDraw(chart){
+  const ctx=chart.ctx; const horiz=chart.options.indexAxis==='y';
+  chart.data.datasets.forEach((ds,dsIndex)=>{
+    if(ds.type==='line') return;
+    const meta=chart.getDatasetMeta(dsIndex); if(meta.hidden) return;
+    meta.data.forEach((bar,i)=>{
+      const val=ds.data[i]; if(val==null||val===0) return;
+      ctx.save(); ctx.fillStyle='#3a3226'; ctx.font='700 11px "Segoe UI","Noto Sans Thai",sans-serif';
+      if(horiz){ ctx.textAlign=val>=0?'left':'right'; ctx.textBaseline='middle'; ctx.fillText(fmt(val),bar.x+(val>=0?6:-6),bar.y); }
+      else { ctx.textAlign='center'; ctx.textBaseline=val>=0?'bottom':'top'; ctx.fillText(fmt(val),bar.x,bar.y+(val>=0?-4:4)); }
+      ctx.restore();
+    });
+  });
+}};
+// ปลั๊กอินวาดตัวเลขยอดกลางชิ้นโดนัท/พาย (ข้ามชิ้นที่เล็กเกินไปจนไม่มีที่ใส่ตัวเลข)
+const pieValueLabelPlugin={id:'pieValueLabel',afterDatasetsDraw(chart){
+  const ctx=chart.ctx;
+  chart.data.datasets.forEach((ds,dsIndex)=>{
+    const meta=chart.getDatasetMeta(dsIndex); if(meta.hidden) return;
+    const total=ds.data.reduce((a,v)=>a+(Math.abs(+v)||0),0); if(!total) return;
+    meta.data.forEach((arc,i)=>{
+      const val=ds.data[i]; if(!val) return;
+      const pct=Math.abs(val)/total*100; if(pct<4) return; // ชิ้นเล็กเกินไป พื้นที่ไม่พอ ใส่แล้วจะรก
+      const angle=(arc.startAngle+arc.endAngle)/2;
+      const radius=(arc.innerRadius+arc.outerRadius)/2;
+      const x=arc.x+Math.cos(angle)*radius, y=arc.y+Math.sin(angle)*radius;
+      ctx.save(); ctx.font='700 11px "Segoe UI","Noto Sans Thai",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(fmt(val),x,y);
+      ctx.fillStyle='#2b2416'; ctx.fillText(fmt(val),x,y);
+      ctx.restore();
+    });
+  });
+}};
 
 // ================= SUPABASE SYNC =================
 let sbLibReadyResolve; const sbLibReady=new Promise(r=>sbLibReadyResolve=r);
