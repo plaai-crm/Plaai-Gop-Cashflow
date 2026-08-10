@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://qlnndvycciihakzuxzjf.supabase.co wss://qlnndvycciihakzuxzjf.supabase.co; object-src 'none'; base-uri 'none'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <title>PLAAI Hotel Group — กระแสเงินสด &amp; ประมาณการ</title>
-<!-- build: 2026-08-10 · ยกยอดเงินสดข้ามปี · โมเดลบ่อวิน 2 · แถบเตือน GOP ว่าง · SQL สิทธิ์ v3 -->
+<!-- build: 2026-08-10b · ยกยอดเงินสดข้ามปี · โมเดลบ่อวิน 2 · กติกาตัดค่าใช้จ่ายบ่อวิน 2 ตามวันเปิด · แถบเตือน GOP ว่าง · SQL สิทธิ์ v3 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
@@ -1824,7 +1824,26 @@ function viewConsDetail(key){
   const drawn=s.draws.reduce((a,d)=>a+(+d.amount||0),0);
   const used=s.uses.reduce((a,u)=>a+(+u.amount||0),0);
   const creditLeft=(+s.creditLine||0)-drawn;
-  const cashInHand=drawn-used;
+  // --- กติกาบ่อวิน 2 (ยึดตามวันที่เปิดโรงแรม B2_OPEN = ก.พ. 2027) ---
+  // ก่อนเปิด : บ่อวิน 2 ยังไม่มีรายได้ → ค่าใช้จ่ายจ่ายจากวงเงินกู้ก่อสร้าง จึงมาตัด "เงินสดคงเหลือในมือ" ก้อนนี้
+  // ตั้งแต่เปิด: บ่อวิน 2 มีรายได้แล้ว → ค่าใช้จ่ายไปตัดที่ GOP ของตึกตัวเอง ไม่ตัดเงินก้อนนี้
+  const isPostOpenUse=(u)=>{ const m=(u.date||'').slice(0,7); return !!m && m>=B2_OPEN; };
+  const usedPostOpen=isBank? s.uses.reduce((a,u)=>a+(isPostOpenUse(u)?(+u.amount||0):0),0) : 0;
+  const usedPreOpen=used-usedPostOpen;
+  const cashInHand=drawn-usedPreOpen;
+  const THM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const thMonth=(ym)=>ym?(THM[parseInt(ym.slice(5,7),10)-1]+' '+ym.slice(0,4)):'';
+  const b2OpenLbl=thMonth(B2_OPEN);
+  // เดือนล่าสุดที่มีการจ่ายจริง — ใช้บอกว่า "จ่ายจริงถึงเมื่อไหร่"
+  const useMonths=s.uses.map(u=>(u.date||'').slice(0,7)).filter(Boolean).sort();
+  const lastUseMonth=useMonths.length?useMonths[useMonths.length-1]:'';
+  // ยอดคาดการณ์ (จากหน้า 📅 Forecast รายจ่าย ทั้งก้อน) — ยังไม่เกิดจริง จึงไม่ตัดเงินสด
+  const fcItems=state.consForecast||[];
+  const fcTotal=fcItems.reduce((a,f)=>a+(+f.amount||0),0);
+  const fcMonths=Array.from(new Set(fcItems.map(f=>f.month||(f.date||'').slice(0,7)).filter(Boolean))).sort();
+  const fcRange=fcMonths.length?(fcMonths.length===1?thMonth(fcMonths[0]):thMonth(fcMonths[0])+' – '+thMonth(fcMonths[fcMonths.length-1])):'';
+  const cashAfterFc=cashInHand-fcTotal;
+  const needDraw=Math.max(0,-cashAfterFc);
   const hasFlow=s.draws.some(d=>(+d.amount||0)!==0)||s.uses.some(u=>(+u.amount||0)!==0);
   const nTx=s.draws.length+s.uses.length;
   const today=todayStr();
@@ -1834,10 +1853,13 @@ function viewConsDetail(key){
   const usedByDrawTotal=Object.values(usedByDraw).reduce((a,v)=>a+v,0);
   // ยอดใช้แยกตามผู้ใช้ (Owner/โรงแรม/ก่อสร้าง) — สำหรับกราฟวงกลม (เฉพาะแท็บแบงก์)
   const useByCat={owner:0,hotel:0,construction:0,other:0};
-  s.uses.forEach(u=>{ const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
+  s.uses.forEach(u=>{ if(isBank && isPostOpenUse(u)) return; const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
   const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
-  const bankUseUnavail=Math.max(0,drawn-bankUseTotal);
   const CAT_LABEL={owner:'Owner',hotel:'โรงแรม',construction:'ก่อสร้าง',other:'อื่นๆ'};
+  // แถบแยกว่า "จ่ายจริง" ก้อนนี้ ใครดึงไปใช้บ้าง — ไม่ใช่ค่าก่อสร้างบ่อวิน 2 ทั้งหมด
+  const SPLIT_ORDER=['construction','hotel','owner','other'];
+  const SPLIT_LABEL={construction:'ก่อสร้างบ่อวิน 2',hotel:'โรงแรมอื่นยืมไป',owner:'Owner ดึงไป',other:'อื่นๆ/ไม่ระบุ'};
+  const SPLIT_COLOR={construction:'#1b7a4b',hotel:'#c8901f',owner:'#243f66',other:'#8a857a'};
   const catOptsHtml=(cur)=>['<option value="">– ไม่ระบุ</option>']
     .concat(['owner','hotel','construction','other'].map(v=>`<option value="${v}" ${cur===v?'selected':''}>${CAT_LABEL[v]}</option>`)).join('');
   const drawOptsHtml=(cur)=>['<option value="">–</option>']
@@ -1858,7 +1880,7 @@ function viewConsDetail(key){
       const overdue=u.repayDate && !u.repaid && u.repayDate<today;
       return `<tr>
       <td><input class="cell" type="date" style="width:112px" value="${u.date||''}" onchange="editConsUse('${key}',${i},'date',this.value)"></td>
-      <td style="text-align:left"><input class="cell" style="width:280px;text-align:left" value="${escHtml(u.item)}" placeholder="ใช้ทำอะไร" onchange="editConsUse('${key}',${i},'item',this.value)"></td>
+      <td style="text-align:left"><input class="cell" style="width:280px;text-align:left" value="${escHtml(u.item)}" placeholder="ใช้ทำอะไร" onchange="editConsUse('${key}',${i},'item',this.value)">${(isBank&&isPostOpenUse(u))?`<div style="font-size:11px;color:var(--navy2);background:#eef2f8;border-radius:5px;padding:1px 6px;margin-top:3px;display:inline-block">↪ ตัดที่ GOP บ่อวิน 2 (ไม่ตัดเงินก้อนนี้)</div>`:''}</td>
       <td><input class="cell" style="width:100px" value="${numFmt(u.amount||0)}" onchange="editConsUse('${key}',${i},'amount',this.value)"></td>
       <td><select class="cell" style="padding:5px 2px;width:78px" onchange="editConsUse('${key}',${i},'srcDraw',this.value)">${drawOptsHtml(u.srcDraw||'')}</select></td>
       <td><select class="cell" style="padding:5px 2px;width:88px" onchange="editConsUse('${key}',${i},'category',this.value)">${catOptsHtml(u.category||'')}</select></td>
@@ -1883,13 +1905,52 @@ function viewConsDetail(key){
       <div class="box"><div class="lbl">วงเงินรวม</div><div class="val">${fmt(+s.creditLine||0)}</div><div class="cap">บาท</div></div>
       <div class="box" style="border-left-color:var(--navy2)"><div class="lbl">เบิก/รับเข้ามาแล้วรวม</div><div class="val">${fmt(drawn)}</div><div class="cap">บาท</div></div>
       ${(+s.creditLine||0)>0?`<div class="box" style="border-left-color:var(--gold)"><div class="lbl">วงเงินคงเหลือ (ยังเบิกได้)</div><div class="val" style="color:${creditLeft>=0?'var(--pos)':'var(--neg)'}">${fmt(creditLeft)}</div><div class="cap">วงเงิน − เบิกแล้ว</div></div>`:''}
-      <div class="box" style="border-left-color:var(--neg)"><div class="lbl">ใช้จ่ายไปแล้วรวม</div><div class="val" style="color:var(--neg)">${fmt(used)}</div><div class="cap">บาท</div></div>
-      <div class="box" style="border-left-color:var(--pos)"><div class="lbl">💰 เงินสดคงเหลือในมือ</div><div class="val" style="color:${cashInHand>=0?'var(--pos)':'var(--neg)'}">${fmt(cashInHand)}</div><div class="cap">เบิกเข้ามา − ใช้ไป</div></div>
+      <div class="box" style="border-left-color:var(--neg)"><div class="lbl">${isBank?'จ่ายจริงไปแล้ว':'ใช้จ่ายไปแล้วรวม'}</div><div class="val" style="color:var(--neg)">${fmt(used)}</div><div class="cap">${isBank?(lastUseMonth?`ตัดเงินสดก้อนนี้แล้ว · ถึง ${thMonth(lastUseMonth)}`:'ตัดเงินสดก้อนนี้แล้ว'):'บาท'}</div></div>
+      <div class="box" style="border-left-color:var(--pos)"><div class="lbl">💰 เงินสดคงเหลือในมือ</div><div class="val" style="color:${cashInHand>=0?'var(--pos)':'var(--neg)'}">${fmt(cashInHand)}</div><div class="cap">เบิกเข้ามา − จ่ายจริง</div></div>
     </div>
+    ${(isBank&&bankUseTotal>0)?`<div class="growthbox" style="display:block;background:#fbf9f4;border-color:#e8e0cf;margin-top:2px">
+      <div style="font-size:12.5px;color:#6b5426;margin-bottom:7px"><b>จ่ายจริง ${fmt(bankUseTotal)} บาท — แยกว่าใครดึงไปใช้</b> <span style="color:var(--muted);font-weight:400">(ไม่ใช่ค่าก่อสร้างบ่อวิน 2 ทั้งก้อน)</span></div>
+      <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:#ece7dc">
+        ${SPLIT_ORDER.map(c=>useByCat[c]>0?`<div title="${SPLIT_LABEL[c]} ${fmt(useByCat[c])}" style="width:${(useByCat[c]/bankUseTotal*100).toFixed(2)}%;background:${SPLIT_COLOR[c]}"></div>`:'').join('')}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:9px">
+        ${SPLIT_ORDER.map(c=>useByCat[c]>0?`<div style="display:flex;align-items:center;gap:6px;font-size:12.5px">
+          <span style="width:10px;height:10px;border-radius:3px;background:${SPLIT_COLOR[c]};flex:none"></span>
+          <span style="color:var(--muted)">${SPLIT_LABEL[c]}</span>
+          <b style="color:var(--ink)">${fmt(useByCat[c])}</b>
+          <span style="color:var(--muted)">(${Math.round(useByCat[c]/bankUseTotal*100)}%)</span>
+        </div>`:'').join('')}
+      </div>
+      ${bankUseTotal>drawn?`<p class="hint" style="color:var(--neg);margin:8px 0 0">⚠️ ยอดใช้เงินที่บันทึกไว้ (${fmt(bankUseTotal)}) มากกว่ายอดที่เบิกจริง (${fmt(drawn)}) — ลองตรวจสอบรายการด้านล่างอีกครั้ง</p>`:''}
+    </div>`:''}
+    ${isBank?`<div style="margin-top:10px;border:1.5px dashed #b9c4d6;border-radius:12px;background:#f5f7fb;padding:12px 14px">
+      <div style="font-weight:700;font-size:13.5px;color:var(--navy2);margin-bottom:2px">📅 มองไปข้างหน้า — ยอดคาดการณ์ (ยังไม่เกิดจริง จึงยังไม่ตัดเงินสดด้านบน)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">ดึงจากหน้า "📅 Forecast รายจ่าย" ทั้งก้อน${fcRange?` · ${fcRange}`:''} — แก้ตัวเลขได้ที่หน้านั้น</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <div style="flex:1 1 190px;background:#fff;border-radius:10px;padding:10px 12px;border-left:4px solid #6b7ea1">
+          <div style="font-size:12.5px;color:var(--muted)">คาดว่าจะต้องจ่ายอีก</div>
+          <div style="font-size:22px;font-weight:800;color:#41536f;letter-spacing:-.5px">${fmt(fcTotal)}</div>
+          <div style="font-size:11.5px;color:var(--muted)">${fcRange||'ยังไม่ได้ใส่ยอดคาดการณ์'}</div>
+        </div>
+        <div style="flex:1 1 190px;background:#fff;border-radius:10px;padding:10px 12px;border-left:4px solid ${cashAfterFc>=0?'var(--pos)':'var(--neg)'}">
+          <div style="font-size:12.5px;color:var(--muted)">เงินสดหลังหักคาดการณ์</div>
+          <div style="font-size:22px;font-weight:800;color:${cashAfterFc>=0?'var(--pos)':'var(--neg)'};letter-spacing:-.5px">${fmt(cashAfterFc)}</div>
+          <div style="font-size:11.5px;color:var(--muted)">เงินสดในมือ − คาดการณ์</div>
+        </div>
+        <div style="flex:1 1 190px;background:#fff;border-radius:10px;padding:10px 12px;border-left:4px solid ${needDraw>0?'var(--neg)':'var(--pos)'}">
+          <div style="font-size:12.5px;color:var(--muted)">${needDraw>0?'⚠️ ต้องเบิกงวดถัดไปอย่างน้อย':'✅ เงินสดพอสำหรับคาดการณ์'}</div>
+          <div style="font-size:22px;font-weight:800;color:${needDraw>0?'var(--neg)':'var(--pos)'};letter-spacing:-.5px">${needDraw>0?fmt(needDraw):'ไม่ต้องเบิกเพิ่ม'}</div>
+          <div style="font-size:11.5px;color:var(--muted)">${needDraw>0?(creditLeft>=needDraw?`วงเงินยังเบิกได้ ${fmt(creditLeft)} — เพียงพอ`:`⚠️ วงเงินเหลือ ${fmt(creditLeft)} อาจไม่พอ`):'จากยอดคาดการณ์ปัจจุบัน'}</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid #e3e8f0">
+        🏗️ <b>กติกาบ่อวิน 2:</b> ค่าใช้จ่ายที่ลงวันที่ <b>ก่อน ${b2OpenLbl}</b> ตัดเงินสดก้อนนี้ (ยังไม่มีรายได้) · ตั้งแต่ <b>${b2OpenLbl}</b> เป็นต้นไป ไปตัดที่ <b>GOP ของบ่อวิน 2</b> เอง — ปัจจุบันเข้าเงื่อนไขหลังเปิดแล้ว ${fmt(usedPostOpen)} บาท
+      </div>
+    </div>`:''}
     <div class="grid2" style="margin-top:6px">
       <div class="chartcard">
         <div class="ct">📈 กระแสเงิน: เบิก · ใช้ · คงเหลือ (ตามเวลา)</div>
-        <div class="cs">แท่งเขียว = เงินเบิก/รับเข้า · แท่งแดง = ใช้จ่ายออก · เส้นน้ำเงิน = เงินสดในมือสะสม</div>
+        <div class="cs">แท่งเขียว = เงินเบิก/รับเข้า · แท่งแดง = ใช้จ่ายออก · เส้นน้ำเงิน = เงินสดในมือสะสม${isBank?` <span style="color:#8a6d3b">(ไม่รวมรายการตั้งแต่ ${b2OpenLbl} ที่ไปตัด GOP บ่อวิน 2)</span>`:''}</div>
         ${hasFlow?`<div class="cbox" style="height:280px"><canvas id="consFlowChart"></canvas></div>`:`<div style="text-align:center;color:var(--muted);font-size:13.5px;padding:40px 16px;background:repeating-linear-gradient(45deg,#fbfaf6,#fbfaf6 12px,#f7f4ec 12px,#f7f4ec 24px);border-radius:10px">ยังไม่มีรายการเบิก/ใช้เงิน — เพิ่มรายการด้านล่างเพื่อให้กราฟแสดงผล</div>`}
       </div>
       <div class="chartcard">
@@ -1898,12 +1959,6 @@ function viewConsDetail(key){
         <div class="cbox" style="height:250px"><canvas id="consUtilChart"></canvas></div>
       </div>
     </div>
-    ${isBank && drawn>0?`<div class="chartcard" style="margin-top:6px">
-      <div class="ct">🥧 เงินกู้ที่เบิกแล้ว ${fmt(drawn)} บาท — ใครดึงไปใช้เท่าไหร่</div>
-      <div class="cs">แบ่งตามผู้ใช้ที่บันทึกไว้ในตาราง "② การใช้เงิน" ด้านล่าง (Owner / โรงแรม / ก่อสร้าง) · ส่วนที่เหลือ = ยังไม่ถูกดึงไปใช้ (ใช้ได้อยู่)</div>
-      <div class="cbox" style="height:270px"><canvas id="bankCatChart"></canvas></div>
-      ${bankUseTotal>drawn?`<p class="hint" style="color:var(--neg)">⚠️ ยอดใช้เงินที่บันทึกไว้ (${fmt(bankUseTotal)}) มากกว่ายอดที่เบิกจริง (${fmt(drawn)}) — ลองตรวจสอบรายการด้านล่างอีกครั้ง</p>`:''}
-    </div>`:''}
     ${isBank?`<div class="chartcard" style="margin-top:6px">
         <div class="ct">📊 รายจ่ายรายเดือน — ยอดคาดการณ์</div>
         <div class="cs">จากหน้า "📅 Forecast รายจ่าย" ของโครงการบ่อวิน 2</div>
@@ -1927,7 +1982,7 @@ function viewConsDetail(key){
       <p class="hint" style="margin:0 0 8px">ระบุได้ว่าใช้เงินจากงวดเบิกไหน และผู้ใช้เป็น Owner / โรงแรม / ก่อสร้าง — ถ้าเป็นการยืมชั่วคราว (เช่นโรงแรมขอยืมไปใช้ก่อน) ให้ใส่วันครบกำหนดคืนด้วย${unassignedUsed?` · <b style="color:var(--neg)">ยังไม่ระบุงวด ${fmt(unassignedUsed)} บาท</b>`:''}</p>
       <div class="tblwrap"><table>
         <thead><tr><th>วันที่</th><th style="text-align:left">รายการที่ใช้</th><th>ยอด</th><th>ใช้จากงวด</th><th>ผู้ใช้/ประเภท</th><th>กำหนดคืนเงิน</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
-        <tbody>${useRows}<tr class="total"><td colspan="2">รวมใช้เงิน</td><td>${fmt(used)}</td><td colspan="5"></td></tr></tbody>
+        <tbody>${useRows}<tr class="total"><td colspan="2">รวมใช้เงิน</td><td>${fmt(used)}</td><td colspan="5" style="text-align:left;font-weight:400;font-size:12px;color:var(--muted)">${isBank?`ตัดเงินสดก้อนนี้ (ก่อน ${b2OpenLbl}) ${fmt(usedPreOpen)} บาท · ไปตัด GOP บ่อวิน 2 ${fmt(usedPostOpen)} บาท`:''}</td></tr></tbody>
       </table></div>
       <button class="mini primary" style="margin-top:10px" onclick="addConsUse('${key}')">➕ เพิ่มรายการใช้เงิน</button>
     </details>
@@ -2967,10 +3022,13 @@ if(window.Chart){
   Chart.defaults.scales.linear.grid={color:CHART_GRID,drawTicks:false};
 }
 // สร้าง dataset ของ "กราฟเงินก่อสร้าง 3 แหล่ง" — cumulative เบิก vs ใช้ + เงินคงเหลือในมือ ตามวันที่
-function consDetailChartData(s){
+function consDetailChartData(s,isBank){
   const evs=[];
   (s.draws||[]).forEach(d=>{ if((+d.amount||0)!==0) evs.push({date:d.date||'',draw:+d.amount||0,use:0}); });
-  (s.uses||[]).forEach(u=>{ if((+u.amount||0)!==0) evs.push({date:u.date||'',draw:0,use:+u.amount||0}); });
+  // แท็บแบงก์: รายการตั้งแต่ ก.พ. 2027 ไปตัดที่ GOP บ่อวิน 2 → ไม่นำมาลดเส้นเงินสดในมือ
+  (s.uses||[]).forEach(u=>{ if((+u.amount||0)===0) return;
+    const m=(u.date||'').slice(0,7); if(isBank && m && m>=B2_OPEN) return;
+    evs.push({date:u.date||'',draw:0,use:+u.amount||0}); });
   if(!evs.length) return null;
   evs.sort((a,b)=>ymdToNum(a.date)-ymdToNum(b.date));
   const labels=[],drawSeries=[],useSeries=[],handSeries=[];
@@ -3007,20 +3065,7 @@ function drawCharts(){
     const drawn=(s.draws||[]).reduce((a,d)=>a+(+d.amount||0),0);
     const used=(s.uses||[]).reduce((a,u)=>a+(+u.amount||0),0);
     const credit=+s.creditLine||0;
-    const cd=consDetailChartData(s);
-    if(consSub==='bank' && document.getElementById('bankCatChart')){
-      const useByCat={owner:0,hotel:0,construction:0,other:0};
-      (s.uses||[]).forEach(u=>{ const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
-      const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
-      const bankUseUnavail=Math.max(0,drawn-bankUseTotal);
-      const CAT_LABEL2={owner:'Owner',hotel:'โรงแรม',construction:'ก่อสร้าง',other:'อื่นๆ/ไม่ระบุ'};
-      const CAT_COLOR2={owner:'#243f66',hotel:'#c8901f',construction:'#1b7a4b',other:'#8a857a'};
-      let labels=[],data=[],colors=[];
-      ['owner','hotel','construction','other'].forEach(cat=>{ if(useByCat[cat]>0){ labels.push(CAT_LABEL2[cat]); data.push(useByCat[cat]); colors.push(CAT_COLOR2[cat]); } });
-      if(bankUseUnavail>0){ labels.push('คงเหลือยังไม่ใช้ (ใช้ได้อยู่)'); data.push(bankUseUnavail); colors.push('#e4ddce'); }
-      if(data.some(x=>x>0))
-        charts.bu=new Chart(document.getElementById('bankCatChart'),{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},plugins:[pieValueLabelPlugin],options:pieOpt('เบิกแล้ว → ใครใช้ไปเท่าไหร่')}); // ใช้ tooltip:false ร่วมกับ pieOpt เพราะมีตัวเลขกำกับติดกราฟอยู่แล้ว
-    }
+    const cd=consDetailChartData(s,consSub==='bank');
     // แท่งรายเดือน: คาดการณ์ (จากหน้า Forecast) vs จ่ายจริง (จากตาราง "② การใช้เงิน" ของแบงก์ 70 ล้าน)
     if(consSub==='bank'){
       const fcTotals=monthlyTotals(state.consForecast,'month','amount');
