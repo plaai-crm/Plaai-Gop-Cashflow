@@ -679,11 +679,9 @@ function migrate(){
   CONS_KEYS.forEach(k=>{ if(!state.consDetail[k]) state.consDetail[k]=JSON.parse(JSON.stringify(CONS_DETAIL_SEED[k]));
     if(!Array.isArray(state.consDetail[k].draws)) state.consDetail[k].draws=[];
     if(!Array.isArray(state.consDetail[k].uses)) state.consDetail[k].uses=[];
-    // ใหม่: บันทึกการคืนเงินให้ผู้ให้ยืม (โรงแรมบ่อวิน 1 / Owner)
-    if(!Array.isArray(state.consDetail[k].repays)) state.consDetail[k].repays=[];
     // เติม id ให้งวดเบิกเก่า (ไว้ผูกกับรายการใช้เงินว่าใช้จากงวดไหน)
     state.consDetail[k].draws.forEach((d,i)=>{ if(!d.id) d.id='dr'+i+'_'+Math.random().toString(36).slice(2,8); });
-    // แท็บบ่อวิน 1: ระบุว่าเงินงวดนี้ต้องคืนใคร — '' = คืนโรงแรมบ่อวิน 1 · 'owner' = เงิน Owner (ติดตามการคืนที่แท็บเงินยืม Owner จึงไม่นับซ้ำ)
+    // แท็บบ่อวิน 1: แยกเงินแต่ละงวดว่าเป็นเงินโรงแรม ('') หรือเงิน Owner ('owner') — ใช้คำนวณแถว "เงินยืมจากโรงแรม" ในหน้าภาพรวม (ไม่นับเงิน Owner ซ้ำ)
     if(k==='bowin1') state.consDetail[k].draws.forEach(d=>{ if(d.lender===undefined) d.lender=/owner/i.test(d.note||'')?'owner':''; });
     // เติมฟิลด์ใหม่ให้รายการใช้เงินเก่า: srcDraw (ใช้จากงวดเบิกไหน) · category (Owner/โรงแรม/ก่อสร้าง) · repayDate/repaid (กรณียืมชั่วคราวต้องคืน)
     state.consDetail[k].uses.forEach(u=>{
@@ -703,12 +701,7 @@ function migrate(){
     (c.uses||[]).forEach(x=>{ if(x.link) return;
       if(U[x.id]) x.link=U[x.id];
       if(x.id==='u4' && /บ่อวิน/.test(x.name||'')) x.link='b1Spend'; });
-    const hi=(c.uses||[]).findIndex(u=>u.link==='bankHotel');
-    if(hi>=0 && !c.uses.some(u=>u.link==='bankRepayB1')) c.uses.splice(hi+1,0,{id:'u_repayB1',name:'คืนเงินยืมบ่อวิน 1 (เงินจากการกู้ BBL )',amount:0,link:'bankRepayB1'});
     if(c.ownerLoan) c.ownerLoan.linked=true;
-    // รายการ "เงินกู้ บ่อวิน 1" 1,000,000 (7 ก.ย. 2026) = การคืนเงินให้บ่อวิน 1 (ยืนยันโดย Rada 20 ต.ค. 2026)
-    const bu=((state.consDetail.bank&&state.consDetail.bank.uses)||[]).find(u=>u.id==='us1788834736165');
-    if(bu && bu.category==='hotel' && /บ่อวิน\s*1/.test(bu.item||'')) bu.category='repayB1';
     state._migConsLinks=1;
   }
   // ---- โรงแรมยืมเงินก่อสร้าง: ตารางเงินที่โรงแรมคืนให้ก่อสร้าง + แถวแหล่งเงินในหน้าภาพรวม ----
@@ -718,7 +711,7 @@ function migrate(){
     state.consDetail.bank.hlBldgs=[{id:'prime',name:nm('prime','PLAAI Prime')},{id:'play',name:nm('play','PLAAI Play')},{id:'saroj',name:nm('saroj','PLAAI Plus สาโรจน์')},{id:'bowin',name:nm('bowin','PLAAI Plus บ่อวิน')},{id:'other',name:'ไม่ระบุตึก / ส่วนกลาง'}];
   }
   if(!state.consDetail.bank.hlBldgs.some(x=>x.id==='other')) state.consDetail.bank.hlBldgs.push({id:'other',name:'ไม่ระบุตึก / ส่วนกลาง'});
-  // ยอด "เงินกู้ บ่อวิน 1" = บ่อวินยืมเงินก่อสร้าง → รวมในโรงแรมยืม (ตึกบ่อวิน) · เลิกใช้ประเภท "คืนบ่อวิน 1"
+  // ล้างของเวอร์ชันก่อน (20 ต.ค. 2026): ประเภท "คืนบ่อวิน 1" เลิกใช้ — รายการ "เงินกู้ บ่อวิน 1" = บ่อวินยืมเงินก่อสร้าง → ประเภทโรงแรม ตึกบ่อวิน
   (state.consDetail.bank.uses||[]).forEach(u=>{ if(u.category==='repayB1'){ u.category='hotel'; if(!u.bldg) u.bldg='bowin'; } });
   if(Array.isArray(state.construction.uses)) state.construction.uses=state.construction.uses.filter(u=>u.link!=='bankRepayB1');
   if(!state._migHotelLoan){
@@ -1138,19 +1131,16 @@ function render(){
 function sumAmt(arr,f){ return (arr||[]).reduce((a,x)=>a+((!f||f(x))?(+x.amount||0):0),0); }
 function isPostOpenDate(d){ const m=(d||'').slice(0,7); return !!m && m>=B2_OPEN; }
 // ยอดใช้เงินแบงก์แยกประเภท — กติกาเดียวกับแท็บแบงก์ (รายการตั้งแต่วันเปิดบ่อวิน 2 ไปตัด GOP บ่อวิน 2 จึงไม่นับ)
-function bankUseByCat(){ const b=state.consDetail&&state.consDetail.bank; const o={construction:0,hotel:0,repayB1:0,owner:0,other:0};
+function bankUseByCat(){ const b=state.consDetail&&state.consDetail.bank; const o={construction:0,hotel:0,owner:0,other:0};
   ((b&&b.uses)||[]).forEach(u=>{ if(isPostOpenDate(u.date)) return; const c=(u.category&&o.hasOwnProperty(u.category))?u.category:'other'; o[c]+=(+u.amount||0); }); return o; }
-// เงินยืมบ่อวิน 1: ยอดที่ต้องคืนโรงแรม (ไม่รวมเงิน Owner) และยอดคืนแล้ว = รายการ "คืนบ่อวิน 1" ในแท็บแบงก์ + รายการคืนจากเงินก้อนอื่นที่กรอกในแท็บบ่อวิน 1
-function b1RepayInfo(){ const s=(state.consDetail&&state.consDetail.bowin1)||{draws:[],uses:[]}; const bank=state.consDetail&&state.consDetail.bank;
-  const drawn=sumAmt(s.draws), ownerDrawn=sumAmt(s.draws,d=>d.lender==='owner'), hotelDrawn=drawn-ownerDrawn;
-  const bankRows=((bank&&bank.uses)||[]).filter(u=>u.category==='repayB1'&&(+u.amount||0)!==0);
-  const manual=Array.isArray(s.repays)?s.repays:[];
-  const repaid=sumAmt(bankRows)+sumAmt(manual);
-  return {drawn,ownerDrawn,hotelDrawn,bankRows,manual,repaid,owed:hotelDrawn-repaid,spend:sumAmt(s.uses)}; }
-const CONS_LINK_LABEL={bankDrawn:'แท็บแบงก์ 70 ล้าน — ยอดเบิกแล้ว',b1Hotel:'แท็บเงินยืมบ่อวิน 1 — ยอดที่ต้องคืนโรงแรม (ไม่รวมเงิน Owner)',b1Spend:'แท็บเงินยืมบ่อวิน 1 — ใช้จ่ายรวม',bankCons:'แท็บแบงก์ — ประเภท "ก่อสร้าง"',bankHotel:'แท็บแบงก์ — ประเภท "โรงแรม"',bankRepayB1:'แท็บแบงก์ — ประเภท "คืนบ่อวิน 1"',bankOwner:'แท็บแบงก์ — ประเภท "Owner"',bankOther:'แท็บแบงก์ — ไม่ระบุประเภท/อื่นๆ',hotelRepaid:'แท็บโรงแรมยืมก่อสร้าง — ยอดที่โรงแรมคืนแล้ว'};
+// แท็บเงินยืมบ่อวิน 1: ยอดเงินโรงแรม (ไม่รวมงวดที่เป็นเงิน Owner) และยอดใช้จ่ายรวม
+function b1Info(){ const s=(state.consDetail&&state.consDetail.bowin1)||{draws:[],uses:[]};
+  const drawn=sumAmt(s.draws), ownerDrawn=sumAmt(s.draws,d=>d.lender==='owner');
+  return {drawn,ownerDrawn,hotelDrawn:drawn-ownerDrawn,spend:sumAmt(s.uses)}; }
+const CONS_LINK_LABEL={bankDrawn:'แท็บแบงก์ 70 ล้าน — ยอดเบิกแล้ว',b1Hotel:'แท็บเงินยืมบ่อวิน 1 — ยอดเงินโรงแรม (ไม่รวมเงิน Owner)',b1Spend:'แท็บเงินยืมบ่อวิน 1 — ใช้จ่ายรวม',bankCons:'แท็บแบงก์ — ประเภท "ก่อสร้าง"',bankHotel:'แท็บแบงก์ — ประเภท "โรงแรม"',bankOwner:'แท็บแบงก์ — ประเภท "Owner"',bankOther:'แท็บแบงก์ — ไม่ระบุประเภท/อื่นๆ',hotelRepaid:'แท็บโรงแรมยืมก่อสร้าง — ยอดที่โรงแรมคืนแล้ว'};
 function consLinkValue(link){ const bank=state.consDetail&&state.consDetail.bank;
-  switch(link){ case 'bankDrawn': return sumAmt(bank&&bank.draws); case 'b1Hotel': return b1RepayInfo().hotelDrawn; case 'b1Spend': return b1RepayInfo().spend;
-    case 'bankCons': return bankUseByCat().construction; case 'bankHotel': return bankUseByCat().hotel; case 'bankRepayB1': return bankUseByCat().repayB1;
+  switch(link){ case 'bankDrawn': return sumAmt(bank&&bank.draws); case 'b1Hotel': return b1Info().hotelDrawn; case 'b1Spend': return b1Info().spend;
+    case 'bankCons': return bankUseByCat().construction; case 'bankHotel': return bankUseByCat().hotel;
     case 'bankOwner': return bankUseByCat().owner; case 'bankOther': return bankUseByCat().other;
     case 'hotelRepaid': return hotelLoanInfo().repaid; }
   return null; }
@@ -1189,7 +1179,6 @@ function viewConstruction(){
   const c=state.construction;
   syncConsLinks();
   c.sources[2].amount=(+c.ownerLoan.borrowed||0)-(+c.ownerLoan.returned||0);
-  const b1i=b1RepayInfo();
   const linkTag=(x)=>x.link?`<span title="ดึงอัตโนมัติจาก ${CONS_LINK_LABEL[x.link]||''} — แก้ตัวเลขที่แท็บนั้น" style="font-size:12px;color:var(--navy2);white-space:nowrap">🔗 ${(CONS_LINK_LABEL[x.link]||'').split(' — ')[0].replace('แท็บ','')}</span>`:'';
   const srcTotal=c.sources.reduce((s,x)=>s+(+x.amount||0),0);
   const useTotal=c.uses.reduce((s,x)=>s+(+x.amount||0),0);
@@ -1947,73 +1936,15 @@ function viewConsDetail(key){
   const usedByDraw={}; s.uses.forEach(u=>{ if(u.srcDraw){ usedByDraw[u.srcDraw]=(usedByDraw[u.srcDraw]||0)+(+u.amount||0); } });
   const unassignedUsed=s.uses.reduce((a,u)=>a+((!u.srcDraw)?(+u.amount||0):0),0);
   const usedByDrawTotal=Object.values(usedByDraw).reduce((a,v)=>a+v,0);
-  // --- การคืนเงินให้ผู้ให้ยืม (เฉพาะแท็บเงินยืม: บ่อวิน 1 / Owner) ---
-  // 20 ต.ค. 2026: ผู้ใช้ขอให้แท็บเงินยืมบ่อวิน 1 กลับเป็นหน้าเดิม (ยอดบ่อวินยืมเงินก่อสร้าง ไปอยู่ในแท็บโรงแรมยืมก่อสร้างแทน)
-  const isB1=false;   // ส่วน "คืนเงิน" ใช้เฉพาะแท็บเงินยืมบ่อวิน 1 (แท็บ Owner บันทึกการคืนไว้ในตาราง ② อยู่แล้ว)
-  // เงิน Owner ที่ผ่านแท็บนี้ ไม่นับเป็นยอดที่ต้องคืนโรงแรม (การคืน Owner บันทึกที่แท็บเงินยืม Owner ที่เดียว)
-  // คืนแล้ว = รายการประเภท "คืนบ่อวิน 1" ในแท็บแบงก์ (ดึงมาเอง) + รายการคืนจากเงินก้อนอื่นที่กรอกในตารางนี้
-  const b1=isB1?b1RepayInfo():{manual:[],bankRows:[],repaid:0,ownerDrawn:0};
-  const repays=b1.manual, bankRepays=b1.bankRows;
-  const repaid=b1.repaid;
-  const ownerDrawn=b1.ownerDrawn;
-  const hotelDrawn=drawn-ownerDrawn;
-  const owed=hotelDrawn-repaid;
-  const repaidPct=hotelDrawn>0?Math.min(100,Math.max(0,repaid/hotelDrawn*100)):0;
-  const repayCount=repays.length+bankRepays.length;
-  const repayDates=repays.concat(bankRepays).map(r=>r.date||'').filter(Boolean).sort();
-  const lastRepay=repayDates.length?repayDates[repayDates.length-1]:'';
-  const VIA_LBL={bank:'เงินกู้แบงก์ 70 ล้าน',project:'เงินสดโครงการบ่อวิน 2',b2gop:'รายได้/GOP บ่อวิน 2',offset:'หักกลบ/ตัดบัญชี',other:'อื่นๆ'};
-  const viaOptsHtml=(cur)=>['<option value="">– ไม่ระบุ</option>']
-    .concat(Object.keys(VIA_LBL).filter(v=>v!=='bank'||cur==='bank').map(v=>`<option value="${v}" ${cur===v?'selected':''}>${VIA_LBL[v]}</option>`)).join('');
-  const bankRepayRows=bankRepays.map((u,j)=>`<tr style="background:#f3f8f4">
-      <td style="color:var(--muted)"><b>${j+1}</b></td>
-      <td>${u.date?fmtDate(u.date):'–'}</td>
-      <td style="text-align:left">${escHtml(u.item||'')} <span style="font-size:11px;color:var(--navy2);background:#eef2f8;border-radius:5px;padding:1px 6px;white-space:nowrap">🔗 จากแท็บแบงก์ 70 ล้าน</span></td>
-      <td style="color:var(--pos);font-weight:700">${fmt(+u.amount||0)}</td>
-      <td>เงินกู้แบงก์ 70 ล้าน</td>
-      <td style="text-align:left;color:var(--muted)">${escHtml(u.note||'')}</td>
-      <td></td></tr>`).join('');
-  const repayRows=(repays.length||bankRepays.length)? bankRepayRows+repays.map((r,i)=>`<tr>
-      <td style="color:var(--muted)"><b>${bankRepays.length+i+1}</b></td>
-      <td><input class="cell" type="date" style="width:120px" value="${r.date||''}" onchange="editConsRepay('${key}',${i},'date',this.value)"></td>
-      <td style="text-align:left"><input class="cell" style="width:280px;text-align:left" value="${escHtml(r.item)}" placeholder="เช่น คืนเงินยืมงวดที่ 1 / โอนคืนค่าก่อสร้าง" onchange="editConsRepay('${key}',${i},'item',this.value)"></td>
-      <td><input class="cell" style="width:120px;color:var(--pos);font-weight:700" value="${numFmt(r.amount||0)}" onchange="editConsRepay('${key}',${i},'amount',this.value)"></td>
-      <td><select class="cell" style="padding:5px 2px;width:150px" onchange="editConsRepay('${key}',${i},'via',this.value)">${viaOptsHtml(r.via||'')}</select>${r.via==='bank'?'<div style="font-size:11px;color:var(--neg);margin-top:3px">⚠️ อาจนับซ้ำกับแท็บแบงก์</div>':''}</td>
-      <td style="text-align:left"><input class="cell" style="width:170px;text-align:left" value="${escHtml(r.note)}" placeholder="เลขที่โอน / เอกสารอ้างอิง" onchange="editConsRepay('${key}',${i},'note',this.value)"></td>
-      <td><button class="mini danger" onclick="delConsRepay('${key}',${i})">ลบ</button></td></tr>`).join('')
-    : `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการคืนเงิน — กด "➕ เพิ่มรายการคืนเงิน"</td></tr>`;
-  const mil=(x)=>(x/1e6).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' ล้าน';
-  const headline=!isB1?'':`<div style="margin:4px 0 14px;padding:14px 18px;border-radius:12px;background:#fff;border:1px solid #e8e0cf;font-size:17px;line-height:1.7;color:var(--ink)">
-      ต้องคืนโรงแรมบ่อวิน 1 <b>${mil(hotelDrawn)}</b>
-      <span style="color:var(--muted)">→</span> คืนแล้ว <b style="color:var(--pos)">${mil(repaid)}</b>
-      <span style="color:var(--muted)">→</span> ${owed>0?`ยังค้าง <b style="color:var(--neg)">${mil(owed)}</b>`:(owed<0?`<b style="color:var(--neg)">คืนเกิน ${mil(-owed)}</b>`:`<b style="color:var(--pos)">คืนครบแล้ว 🎉</b>`)}
-      ${s.draws.some(d=>(+d.amount||0)!==0)?`<div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:4px">เงินที่ยืมมาใช้ก่อสร้างในหน้านี้รวม <b style="color:var(--ink)">${mil(drawn)}</b> —
-        ต้องคืนโรงแรม: ${s.draws.filter(d=>(+d.amount||0)!==0&&d.lender!=='owner').map(d=>`${escHtml(d.note||'ไม่ระบุ')} <b style="color:var(--ink)">${mil(+d.amount||0)}</b>`).join(' + ')||'–'}
-        ${ownerDrawn?` · <span style="white-space:nowrap">เงิน Owner <b style="color:var(--ink)">${mil(ownerDrawn)}</b> (ดูการคืนที่แท็บ "เงินยืม Owner")</span>`:''}</div>`:''}
-    </div>`;
-  const repaySection=!isB1?'':`<div style="margin-top:14px;border:1.5px solid #cfe3d6;border-radius:12px;background:#f4faf6;padding:14px 16px">
-      <div style="font-weight:700;font-size:15px;color:var(--pos);margin-bottom:2px">↩️ รายละเอียดการคืนเงิน</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:4px">คืนเมื่อไหร่ · เท่าไหร่ · ใช้เงินก้อนไหนคืน</div>
-      <div style="margin-top:10px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px"><span>ความคืบหน้าการคืนเงิน</span><b style="color:var(--pos)">${repaidPct.toFixed(1)}%</b></div>
-        <div style="height:12px;border-radius:6px;background:#e3ece6;overflow:hidden"><div style="height:100%;width:${repaidPct.toFixed(2)}%;background:var(--pos)"></div></div>
-      </div>
-      <div class="tblwrap" style="margin-top:12px"><table>
-        <thead><tr><th>#</th><th>วันที่คืน</th><th style="text-align:left">รายละเอียด</th><th>ยอดที่คืน</th><th>คืนจากเงินก้อนไหน</th><th style="text-align:left">หมายเหตุ / อ้างอิง</th><th></th></tr></thead>
-        <tbody>${repayRows}<tr class="total"><td colspan="3">รวมคืนแล้ว</td><td style="color:var(--pos)">${fmt(repaid)}</td><td colspan="3" style="text-align:left;font-weight:400;font-size:12px;color:var(--muted)">ค้างคืน ${fmt(owed)} บาท</td></tr></tbody>
-      </table></div>
-      <button class="mini primary edit-only" style="margin-top:10px" onclick="addConsRepay('${key}')">➕ เพิ่มรายการคืนเงิน</button>
-      <p class="hint edit-only" style="margin:8px 0 0">💡 คืนด้วยเงินกู้แบงก์ 70 ล้าน → บันทึกที่แท็บ "แบงก์ 70 ล้าน" ตาราง ② แล้วเลือกประเภท <b>"คืนบ่อวิน 1"</b> รายการจะขึ้นในตารางนี้เอง (แถวสีเขียว 🔗) · ปุ่ม ➕ ใช้กรอกเฉพาะการคืนจากเงินก้อนอื่น</p>
-    </div>`;
   // ยอดใช้แยกตามผู้ใช้ (Owner/โรงแรม/ก่อสร้าง) — สำหรับกราฟวงกลม (เฉพาะแท็บแบงก์)
-  const useByCat={owner:0,hotel:0,repayB1:0,construction:0,other:0};
+  const useByCat={owner:0,hotel:0,construction:0,other:0};
   s.uses.forEach(u=>{ if(isBank && isPostOpenUse(u)) return; const cat=(u.category && useByCat.hasOwnProperty(u.category))?u.category:'other'; useByCat[cat]+=(+u.amount||0); });
   const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
-  const CAT_LABEL={owner:'Owner',hotel:'โรงแรม',repayB1:'คืนบ่อวิน 1',construction:'ก่อสร้าง',other:'อื่นๆ'};
+  const CAT_LABEL={owner:'Owner',hotel:'โรงแรม',construction:'ก่อสร้าง',other:'อื่นๆ'};
   // แถบแยกว่า "จ่ายจริง" ก้อนนี้ ใครดึงไปใช้บ้าง — ไม่ใช่ค่าก่อสร้างบ่อวิน 2 ทั้งหมด
   const SPLIT_ORDER=['construction','hotel','owner','other'];
-  const SPLIT_LABEL={construction:'ก่อสร้างบ่อวิน 2',hotel:'โรงแรมอื่นยืมไป',repayB1:'คืนเงินยืมบ่อวิน 1',owner:'Owner ดึงไป',other:'อื่นๆ/ไม่ระบุ'};
-  const SPLIT_COLOR={construction:'#1b7a4b',hotel:'#c8901f',repayB1:'#2f8f83',owner:'#243f66',other:'#8a857a'};
+  const SPLIT_LABEL={construction:'ก่อสร้างบ่อวิน 2',hotel:'โรงแรมอื่นยืมไป',owner:'Owner ดึงไป',other:'อื่นๆ/ไม่ระบุ'};
+  const SPLIT_COLOR={construction:'#1b7a4b',hotel:'#c8901f',owner:'#243f66',other:'#8a857a'};
   const catOptsHtml=(cur)=>['<option value="">– ไม่ระบุ</option>']
     .concat(['owner','hotel','construction','other'].map(v=>`<option value="${v}" ${cur===v?'selected':''}>${CAT_LABEL[v]}</option>`)).join('');
   const drawOptsHtml=(cur)=>['<option value="">–</option>']
@@ -2026,11 +1957,10 @@ function viewConsDetail(key){
       <td><input class="cell" value="${numFmt(d.amount||0)}" onchange="editConsDraw('${key}',${i},'amount',this.value)"></td>
       <td style="color:var(--neg)">${fmt(usedIn)}</td>
       <td style="color:${remain>=0?'var(--pos)':'var(--neg)'}"><b>${fmt(remain)}</b></td>
-      ${isB1?`<td><select class="cell" style="padding:5px 2px;width:150px" onchange="editConsDraw('${key}',${i},'lender',this.value)"><option value="" ${d.lender!=='owner'?'selected':''}>โรงแรมบ่อวิน 1</option><option value="owner" ${d.lender==='owner'?'selected':''}>Owner</option></select></td>`:''}
       <td style="text-align:left"><input class="cell" style="width:220px;text-align:left" value="${escHtml(d.note)}" placeholder="เช่น เบิกงวดแรก / รับเงินเข้า" onchange="editConsDraw('${key}',${i},'note',this.value)"></td>
       <td><button class="mini danger" onclick="delConsDraw('${key}',${i})">ลบ</button></td></tr>`;
     }).join('')
-    : `<tr><td colspan="${isB1?8:7}" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการเบิก — กด "➕ เพิ่มงวดเบิก"</td></tr>`;
+    : `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีการเบิก — กด "➕ เพิ่มงวดเบิก"</td></tr>`;
   const useRows=s.uses.length? s.uses.map((u,i)=>{
       const overdue=u.repayDate && !u.repaid && u.repayDate<today;
       return `<tr>
@@ -2038,7 +1968,7 @@ function viewConsDetail(key){
       <td style="text-align:left"><input class="cell" style="width:280px;text-align:left" value="${escHtml(u.item)}" placeholder="ใช้ทำอะไร" onchange="editConsUse('${key}',${i},'item',this.value)">${(isBank&&isPostOpenUse(u))?`<div style="font-size:11px;color:var(--navy2);background:#eef2f8;border-radius:5px;padding:1px 6px;margin-top:3px;display:inline-block">↪ ตัดที่ GOP บ่อวิน 2 (ไม่ตัดเงินก้อนนี้)</div>`:''}</td>
       <td><input class="cell" style="width:100px" value="${numFmt(u.amount||0)}" onchange="editConsUse('${key}',${i},'amount',this.value)"></td>
       <td><select class="cell" style="padding:5px 2px;width:78px" onchange="editConsUse('${key}',${i},'srcDraw',this.value)">${drawOptsHtml(u.srcDraw||'')}</select></td>
-      <td><select class="cell" style="padding:5px 2px;width:${isBank?100:88}px" onchange="editConsUse('${key}',${i},'category',this.value)">${catOptsHtml(u.category||'')}</select></td>
+      <td><select class="cell" style="padding:5px 2px;width:88px" onchange="editConsUse('${key}',${i},'category',this.value)">${catOptsHtml(u.category||'')}</select></td>
       <td>
         <input class="cell" type="date" style="width:112px" value="${u.repayDate||''}" onchange="editConsUse('${key}',${i},'repayDate',this.value)" title="วันครบกำหนดคืนเงิน (กรณียืมไปใช้ชั่วคราว เช่น โรงแรมเบิกไปก่อน)">
         ${u.repayDate?`<label style="display:inline-flex;align-items:center;gap:3px;font-size:11.5px;margin-top:3px;color:${overdue?'var(--neg)':'var(--muted)'}"><input type="checkbox" ${u.repaid?'checked':''} onchange="editConsUse('${key}',${i},'repaid',this.checked)"> ${u.repaid?'คืนแล้ว':(overdue?'⚠️ เลยกำหนดคืน':'ยังไม่คืน')}</label>`:''}
@@ -2050,26 +1980,19 @@ function viewConsDetail(key){
   return `<div class="card">
     ${consSubNav()}
     <h2>🏗️ ${escHtml(s.name)}</h2>
-    <p class="hint">${isBank?'วงเงินกู้ก่อสร้างจากธนาคาร แก้ยอดวงเงินได้ · บันทึกการเบิกแต่ละงวด (วันที่ · ยอด) และเงินที่ใช้ไป เพื่อรู้ว่าเหลือวงเงินและเงินสดในมือเท่าไหร่':(isB1?'เงินยืมที่นำมาใช้ก่อสร้างบ่อวิน 2 — หน้านี้ดูว่ายืมมาเท่าไหร่ คืนไปแล้วเท่าไหร่ และยังค้างอีกเท่าไหร่':'บันทึกเงินยืมที่รับเข้ามาแต่ละครั้ง และการใช้เงิน · ตั้งเพดานวงเงิน (ถ้ามี) ได้')}</p>
-    ${headline}
-    ${isB1?'':`<div class="growthbox" style="background:#faf6ee;border-color:#ece2cd">
+    <p class="hint">${isBank?'วงเงินกู้ก่อสร้างจากธนาคาร แก้ยอดวงเงินได้ · บันทึกการเบิกแต่ละงวด (วันที่ · ยอด) และเงินที่ใช้ไป เพื่อรู้ว่าเหลือวงเงินและเงินสดในมือเท่าไหร่':'บันทึกเงินยืมที่รับเข้ามาแต่ละครั้ง และการใช้เงิน · ตั้งเพดานวงเงิน (ถ้ามี) ได้'}</p>
+    <div class="growthbox" style="background:#faf6ee;border-color:#ece2cd">
       <label>${isBank?'💳 วงเงินกู้ธนาคารรวม:':'💳 เพดานวงเงินยืมรวม (ถ้ามี):'}</label>
       <input type="text" inputmode="decimal" value="${numFmt(s.creditLine||0)}" onchange="editConsField('${key}','creditLine',this.value)" style="width:160px">
       <span class="hint">บาท — ${isBank?'ยอดวงเงินที่แบงก์อนุมัติ (เช่น 70,000,000)':'ใส่ 0 ถ้าไม่มีเพดานตายตัว'}</span>
-    </div>`}
-    ${!isB1?'':`<div class="kpi">
-      <div class="box" style="border-left-color:var(--navy2)"><div class="lbl">💵 ต้องคืนโรงแรมบ่อวิน 1</div><div class="val">${fmt(hotelDrawn)}</div><div class="cap">${ownerDrawn?`ไม่รวมเงิน Owner ${fmt(ownerDrawn)}`:'ยอดยืมทั้งหมด'}</div></div>
-      <div class="box" style="border-left-color:var(--pos)"><div class="lbl">✅ คืนแล้ว</div><div class="val" style="color:var(--pos)">${fmt(repaid)}</div><div class="cap">${repayCount} ครั้ง${lastRepay?` · ล่าสุด ${fmtDate(lastRepay)}`:''}</div></div>
-      <div class="box" style="border-left-color:${owed>0?'var(--neg)':'var(--pos)'}"><div class="lbl">${owed>0?'⏳ ยังค้างคืน':(owed<0?'⚠️ คืนเกินยอดยืม':'🎉 คืนครบแล้ว')}</div><div class="val" style="color:${owed>0?'var(--neg)':'var(--pos)'}">${fmt(Math.abs(owed))}</div><div class="cap">ต้องคืน − คืนแล้ว</div></div>
-    </div>`}
-    ${isB1?'':`<div class="kpi">
+    </div>
+    <div class="kpi">
       <div class="box"><div class="lbl">วงเงินรวม</div><div class="val">${fmt(+s.creditLine||0)}</div><div class="cap">บาท</div></div>
       <div class="box" style="border-left-color:var(--navy2)"><div class="lbl">เบิก/รับเข้ามาแล้วรวม</div><div class="val">${fmt(drawn)}</div><div class="cap">บาท</div></div>
       ${(+s.creditLine||0)>0?`<div class="box" style="border-left-color:var(--gold)"><div class="lbl">วงเงินคงเหลือ (ยังเบิกได้)</div><div class="val" style="color:${creditLeft>=0?'var(--pos)':'var(--neg)'}">${fmt(creditLeft)}</div><div class="cap">วงเงิน − เบิกแล้ว</div></div>`:''}
       <div class="box" style="border-left-color:var(--neg)"><div class="lbl">${isBank?'จ่ายจริงไปแล้ว':'ใช้จ่ายไปแล้วรวม'}</div><div class="val" style="color:var(--neg)">${fmt(used)}</div><div class="cap">${isBank?(lastUseMonth?`ตัดเงินสดก้อนนี้แล้ว · ถึง ${thMonth(lastUseMonth)}`:'ตัดเงินสดก้อนนี้แล้ว'):'บาท'}</div></div>
       <div class="box" style="border-left-color:var(--pos)"><div class="lbl">💰 เงินสดคงเหลือในมือ</div><div class="val" style="color:${cashInHand>=0?'var(--pos)':'var(--neg)'}">${fmt(cashInHand)}</div><div class="cap">${hotelBack?`เบิก − จ่ายจริง + โรงแรมคืน ${fmt(hotelBack)}`:'เบิกเข้ามา − จ่ายจริง'}</div></div>
-    </div>`}
-    ${repaySection}
+    </div>
     ${(isBank&&bankUseTotal>0)?`<div class="growthbox" style="display:block;background:#fbf9f4;border-color:#e8e0cf;margin-top:2px">
       <div style="font-size:12.5px;color:#6b5426;margin-bottom:7px"><b>จ่ายจริง ${fmt(bankUseTotal)} บาท — แยกว่าใครดึงไปใช้</b> <span style="color:var(--muted);font-weight:400">(ไม่ใช่ค่าก่อสร้างบ่อวิน 2 ทั้งก้อน)</span></div>
       <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;background:#ece7dc">
@@ -2117,8 +2040,8 @@ function viewConsDetail(key){
         ${hasFlow?`<div class="cbox" style="height:280px"><canvas id="consFlowChart"></canvas></div>`:`<div style="text-align:center;color:var(--muted);font-size:13.5px;padding:40px 16px;background:repeating-linear-gradient(45deg,#fbfaf6,#fbfaf6 12px,#f7f4ec 12px,#f7f4ec 24px);border-radius:10px">ยังไม่มีรายการเบิก/ใช้เงิน — เพิ่มรายการด้านล่างเพื่อให้กราฟแสดงผล</div>`}
       </div>
       <div class="chartcard">
-        <div class="ct">${isBank?'🏦 การใช้วงเงินกู้ (เบิกแล้ว vs คงเหลือ)':(isB1?'↩️ คืนแล้ว vs ยังค้าง':'💰 เบิกเข้า vs ใช้ไป')}</div>
-        <div class="cs">${isBank?'สัดส่วนวงเงินที่เบิกไปแล้ว เทียบกับที่ยังเบิกได้':(isB1?`คืนไปแล้ว ${repaidPct.toFixed(0)}% ของยอดที่ต้องคืนโรงแรม`:'สัดส่วนเงินที่ใช้จ่ายไปแล้ว เทียบกับเงินคงเหลือในมือ')}</div>
+        <div class="ct">${isBank?'🏦 การใช้วงเงินกู้ (เบิกแล้ว vs คงเหลือ)':'💰 เบิกเข้า vs ใช้ไป'}</div>
+        <div class="cs">${isBank?'สัดส่วนวงเงินที่เบิกไปแล้ว เทียบกับที่ยังเบิกได้':'สัดส่วนเงินที่ใช้จ่ายไปแล้ว เทียบกับเงินคงเหลือในมือ'}</div>
         <div class="cbox" style="height:250px"><canvas id="consUtilChart"></canvas></div>
       </div>
     </div>
@@ -2134,13 +2057,11 @@ function viewConsDetail(key){
       </div>`:''}
     <details class="collapsible edit-only" open>
       <summary>📋 รายละเอียดการเบิก &amp; การใช้เงิน (คลิกเพื่อซ่อน/แสดง) <span class="cnt">${nTx} รายการ</span></summary>
-      ${!isB1?'':`<div style="font-size:13px;color:var(--muted);background:#faf8f3;border-radius:8px;padding:8px 12px;margin:4px 0 10px">เงินที่ยืมมาเอาไปใช้: ใช้ไปแล้ว <b style="color:var(--ink)">${fmt(used)}</b> · เหลือในมือ <b style="color:var(--ink)">${fmt(cashInHand)}</b> บาท
-        <span style="margin-left:14px">เพดานวงเงิน (ถ้ามี): <input type="text" inputmode="decimal" class="cell" value="${numFmt(s.creditLine||0)}" onchange="editConsField('${key}','creditLine',this.value)" style="width:120px"></span></div>`}
-      <h3 style="font-size:15px;margin:6px 0 8px">① ${isB1?'การรับเงินยืมเข้ามา (แต่ละครั้ง)':'การเบิก / รับเงินเข้า (แต่ละงวด)'}</h3>
+      <h3 style="font-size:15px;margin:6px 0 8px">① การเบิก / รับเงินเข้า (แต่ละงวด)</h3>
       <p class="hint" style="margin:0 0 8px">คอลัมน์ "คงเหลืองวดนี้" = ยอดเบิกงวดนั้น − ยอดใช้เงินที่ระบุว่าใช้จากงวดนี้ (ในตาราง ② ด้านล่าง)</p>
       <div class="tblwrap"><table>
-        <thead><tr><th>งวด</th><th>วันที่เบิก</th><th>ยอดที่เบิก/รับเข้า</th><th>ใช้ไปจากงวดนี้</th><th>คงเหลืองวดนี้</th>${isB1?'<th>ต้องคืนให้</th>':''}<th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
-        <tbody>${drawRows}<tr class="total"><td colspan="2">รวมเบิก</td><td>${fmt(drawn)}</td><td style="color:var(--neg)">${fmt(usedByDrawTotal)}</td><td><b>${fmt(drawn-usedByDrawTotal)}</b></td><td colspan="${isB1?3:2}"></td></tr></tbody>
+        <thead><tr><th>งวด</th><th>วันที่เบิก</th><th>ยอดที่เบิก/รับเข้า</th><th>ใช้ไปจากงวดนี้</th><th>คงเหลืองวดนี้</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
+        <tbody>${drawRows}<tr class="total"><td colspan="2">รวมเบิก</td><td>${fmt(drawn)}</td><td style="color:var(--neg)">${fmt(usedByDrawTotal)}</td><td><b>${fmt(drawn-usedByDrawTotal)}</b></td><td colspan="2"></td></tr></tbody>
       </table></div>
       <button class="mini primary" style="margin-top:10px" onclick="addConsDraw('${key}')">➕ เพิ่มงวดเบิก</button>
       <h3 style="font-size:15px;margin:22px 0 8px">② การใช้เงิน (ใช้อะไรไปบ้าง)</h3>
@@ -2180,6 +2101,7 @@ function viewHotelLoan(){
       <button class="mini primary" onclick="addHlBldg()">➕ เพิ่มตึก/โรงแรม</button>
       <span class="hint" style="margin:0">ลบตึกแล้ว รายการของตึกนั้นจะย้ายไป "ไม่ระบุตึก" (ยอดไม่หาย)</span></div>`:'';
   const loanRows=hl.loans.length? hl.loans.slice().sort((a,b)=>ymdToNum(a.date)-ymdToNum(b.date)).map(u=>{ const picked=!!(u.bldg&&hlBldgIds().includes(u.bldg));
+      if(!editMode) return `<tr><td>${u.date?fmtDate(u.date):'–'}</td><td style="text-align:left">${escHtml(u.item||'')}</td><td>${fmt(+u.amount||0)}</td><td>${escHtml(hlBldgName(hlBldgOf(u)))}</td><td>${(()=>{const di=(state.consDetail.bank.draws||[]).findIndex(d=>d.id===u.srcDraw); return di>=0?'งวด '+(di+1):'–';})()}</td><td></td></tr>`;
       return `<tr>
         <td><input class="cell" type="date" style="width:120px" value="${u.date||''}" onchange="editHotelLoan('${u.id}','date',this.value)"></td>
         <td style="text-align:left"><input class="cell" style="width:230px;text-align:left" value="${escHtml(u.item)}" placeholder="ยืมไปทำอะไร เช่น เงินกู้ BBL Prime ต.ค." onchange="editHotelLoan('${u.id}','item',this.value)"></td>
@@ -2188,7 +2110,9 @@ function viewHotelLoan(){
         <td><select class="cell" style="padding:5px 2px;width:78px" onchange="editHotelLoan('${u.id}','srcDraw',this.value)">${drawOpts(u.srcDraw||'')}</select></td>
         <td><button class="mini danger" onclick="delHotelLoan('${u.id}')">ลบ</button></td></tr>`; }).join('')
     : `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มี — กด "➕ เพิ่มรายการที่โรงแรมยืม"</td></tr>`;
-  const repRows=hl.repays.length? hl.repays.map((r,i)=>`<tr>
+  const repRows=hl.repays.length? hl.repays.map((r,i)=>!editMode
+      ? `<tr><td>${r.date?fmtDate(r.date):'–'}</td><td>${r.bldg?escHtml(hlBldgName(hlBldgIds().includes(r.bldg)?r.bldg:'other')):'–'}</td><td style="text-align:left">${escHtml(r.item||'')}</td><td style="color:var(--pos);font-weight:700">${fmt(+r.amount||0)}</td><td style="text-align:left;color:var(--muted)">${escHtml(r.note||'')}</td><td></td></tr>`
+      : `<tr>
       <td><input class="cell" type="date" style="width:120px" value="${r.date||''}" onchange="editHotelRepay(${i},'date',this.value)"></td>
       <td><select class="cell" style="padding:5px 2px;width:190px" onchange="editHotelRepay(${i},'bldg',this.value)"><option value="" ${!r.bldg?'selected':''}>– เลือกตึก</option>${bOpts(r.bldg&&hlBldgIds().includes(r.bldg)?r.bldg:(r.bldg?'other':''))}</select></td>
       <td style="text-align:left"><input class="cell" style="width:240px;text-align:left" value="${escHtml(r.item)}" placeholder="เช่น คืนเงินกู้ Prime ที่ยืมไป ก.ย." onchange="editHotelRepay(${i},'item',this.value)"></td>
@@ -3188,9 +3112,6 @@ function addHotelLoan(){ if(ro())return; state.consDetail.bank.uses.push({id:'us
 function editHotelLoan(id,field,val){ if(ro())return; const u=(state.consDetail.bank.uses||[]).find(x=>x.id===id); if(!u)return; u[field]=(field==='amount')?numParse(val):val; save(); render(); }
 function delHotelLoan(id){ if(ro())return; const b=state.consDetail.bank; b.uses=(b.uses||[]).filter(x=>x.id!==id); save(); render(); }
 function setHotelLoanBldg(useId,val){ if(ro())return; const u=(state.consDetail.bank.uses||[]).find(x=>x.id===useId); if(!u)return; u.bldg=val; save(); render(); }
-function addConsRepay(key){ if(ro())return; const s=state.consDetail[key]; if(!Array.isArray(s.repays)) s.repays=[]; s.repays.push({id:'rp'+Date.now(),date:todayStr(),item:'',amount:0,via:'',note:''}); save(); render(); }
-function editConsRepay(key,i,field,val){ if(ro())return; const r=(state.consDetail[key].repays||[])[i]; if(!r)return; r[field]=(field==='amount')?numParse(val):val; save(); render(); }
-function delConsRepay(key,i){ if(ro())return; state.consDetail[key].repays.splice(i,1); save(); render(); }
 function delConsUse(key,i){ if(ro())return; state.consDetail[key].uses.splice(i,1); save(); render(); }
 // ---- Forecast รายการจ่ายโครงการบ่อวิน 2 (ยอดคาดการณ์เท่านั้น) ----
 function addConsForecast(month){ if(ro())return; state.consForecast.push({id:'cf'+Date.now(),month:month||'',date:'',item:'',amount:0,note:''}); save(); render(); }
@@ -3357,8 +3278,7 @@ function drawCharts(){
     }
     if(document.getElementById('consUtilChart')){
       let labels,data,colors;
-      if(false){ const bi=b1RepayInfo(); labels=['คืนแล้ว','ยังค้างคืน']; data=[Math.max(0,Math.min(bi.repaid,bi.hotelDrawn)),Math.max(0,bi.hotelDrawn-bi.repaid)]; colors=['#1b7a4b','#c0392b']; }
-      else if(credit>0){ labels=['เบิกแล้ว','วงเงินคงเหลือ (ยังเบิกได้)']; data=[Math.min(drawn,credit),Math.max(0,credit-drawn)]; colors=['#243f66','#e4ddce']; }
+      if(credit>0){ labels=['เบิกแล้ว','วงเงินคงเหลือ (ยังเบิกได้)']; data=[Math.min(drawn,credit),Math.max(0,credit-drawn)]; colors=['#243f66','#e4ddce']; }
       else { labels=['ใช้จ่ายไปแล้ว','เงินคงเหลือในมือ']; data=[used,Math.max(0,drawn-used)]; colors=['#c0392b','#1b7a4b']; }
       if(data.some(x=>x>0))
         charts.cu=new Chart(document.getElementById('consUtilChart'),{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},plugins:[pieValueLabelPlugin],options:{cutout:'66%',plugins:{legend:{position:'bottom'},tooltip:{enabled:false}}}});
