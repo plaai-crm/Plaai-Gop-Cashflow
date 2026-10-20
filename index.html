@@ -713,6 +713,14 @@ function migrate(){
   }
   // ---- โรงแรมยืมเงินก่อสร้าง: ตารางเงินที่โรงแรมคืนให้ก่อสร้าง + แถวแหล่งเงินในหน้าภาพรวม ----
   if(!Array.isArray(state.consDetail.bank.hotelRepays)) state.consDetail.bank.hotelRepays=[];
+  if(!Array.isArray(state.consDetail.bank.hlBldgs) || !state.consDetail.bank.hlBldgs.length){
+    const nm=(k,d)=>(state.hotels&&state.hotels[k]&&state.hotels[k].name)||d;
+    state.consDetail.bank.hlBldgs=[{id:'prime',name:nm('prime','PLAAI Prime')},{id:'play',name:nm('play','PLAAI Play')},{id:'saroj',name:nm('saroj','PLAAI Plus สาโรจน์')},{id:'bowin',name:nm('bowin','PLAAI Plus บ่อวิน')},{id:'other',name:'ไม่ระบุตึก / ส่วนกลาง'}];
+  }
+  if(!state.consDetail.bank.hlBldgs.some(x=>x.id==='other')) state.consDetail.bank.hlBldgs.push({id:'other',name:'ไม่ระบุตึก / ส่วนกลาง'});
+  // ยอด "เงินกู้ บ่อวิน 1" = บ่อวินยืมเงินก่อสร้าง → รวมในโรงแรมยืม (ตึกบ่อวิน) · เลิกใช้ประเภท "คืนบ่อวิน 1"
+  (state.consDetail.bank.uses||[]).forEach(u=>{ if(u.category==='repayB1'){ u.category='hotel'; if(!u.bldg) u.bldg='bowin'; } });
+  if(Array.isArray(state.construction.uses)) state.construction.uses=state.construction.uses.filter(u=>u.link!=='bankRepayB1');
   if(!state._migHotelLoan){
     const c=state.construction;
     if((c.sources||[]).some(x=>x.link==='bankDrawn') && !c.sources.some(x=>x.link==='hotelRepaid'))
@@ -1148,20 +1156,24 @@ function consLinkValue(link){ const bank=state.consDetail&&state.consDetail.bank
   return null; }
 const r2=(v)=>Math.round(v*100)/100;
 // ===== โรงแรมยืมเงินก่อสร้าง (รายการประเภท "โรงแรม" ในแท็บแบงก์) และการคืนเงินให้ก่อสร้าง =====
-const HL_BLDGS=['prime','play','saroj','bowin','other'];
-function hlBldgName(k){ if(k==='other') return 'ไม่ระบุตึก / ส่วนกลาง'; const h=state.hotels&&state.hotels[k]; return h?h.name:k; }
+// รายชื่อตึก/โรงแรม (เพิ่ม/ลบ/เปลี่ยนชื่อได้ในแท็บโรงแรมยืมก่อสร้าง) — 'other' = ไม่ระบุตึก ลบไม่ได้ ใช้รับรายการของตึกที่ถูกลบ
+function hlBldgArr(){ const b=state.consDetail&&state.consDetail.bank; return (b&&Array.isArray(b.hlBldgs)&&b.hlBldgs.length)?b.hlBldgs:[{id:'other',name:'ไม่ระบุตึก / ส่วนกลาง'}]; }
+function hlBldgIds(){ return hlBldgArr().map(x=>x.id); }
+function hlBldgName(k){ const x=hlBldgArr().find(b=>b.id===k); return x?(x.name||'(ไม่มีชื่อ)'):'ไม่ระบุตึก / ส่วนกลาง'; }
 // ระบบเดาตึกจากชื่อรายการ (ผู้ใช้เลือกเองแล้วจะใช้ค่าที่เลือก)
 function hlGuessBldg(item){ const t=item||'';
   if(/prime|ไพรม์/i.test(t)) return 'prime'; if(/saroj|สาโรจน์/i.test(t)) return 'saroj';
   if(/\bplay\b|เพลย์/i.test(t)) return 'play'; if(/bowin\s*1|บ่อวิน\s*1(?!\d)/i.test(t)) return 'bowin';
   return 'other'; }
-function hlBldgOf(u){ return (u.bldg && HL_BLDGS.includes(u.bldg))?u.bldg:hlGuessBldg(u.item); }
+function hlBldgOf(u){ const ids=hlBldgIds(); if(u.bldg && ids.includes(u.bldg)) return u.bldg;
+  if(u.bldg) return 'other';   // ตึกที่เลือกไว้ถูกลบไปแล้ว
+  const g=hlGuessBldg(u.item); return ids.includes(g)?g:'other'; }
 function hotelLoanInfo(){ const bank=(state.consDetail&&state.consDetail.bank)||{uses:[]};
-  const loans=(bank.uses||[]).filter(u=>u.category==='hotel'&&(+u.amount||0)!==0);
+  const loans=(bank.uses||[]).filter(u=>u.category==='hotel');
   const repays=Array.isArray(bank.hotelRepays)?bank.hotelRepays:[];
-  const by={}; HL_BLDGS.forEach(k=>by[k]={lent:0,repaid:0});
+  const ids=hlBldgIds(); const by={}; ids.forEach(k=>by[k]={lent:0,repaid:0}); if(!by.other) by.other={lent:0,repaid:0};
   loans.forEach(u=>{ by[hlBldgOf(u)].lent+=(+u.amount||0); });
-  repays.forEach(r=>{ const k=HL_BLDGS.includes(r.bldg)?r.bldg:'other'; by[k].repaid+=(+r.amount||0); });
+  repays.forEach(r=>{ const k=ids.includes(r.bldg)?r.bldg:'other'; by[k].repaid+=(+r.amount||0); });
   const lent=sumAmt(loans), repaid=sumAmt(repays);
   return {loans,repays,by,lent,repaid,owed:lent-repaid}; }
 function syncConsLinks(){ const c=state.construction; if(!c) return;
@@ -1211,7 +1223,6 @@ function viewConstruction(){
           <div class="fxrow"><label style="min-width:130px">Owner — ยืมมา</label><input type="text" inputmode="decimal" class="fxamt" ${c.ownerLoan.linked?'disabled':''} value="${numFmt(c.ownerLoan.borrowed||0)}" onchange="editField(['construction','ownerLoan','borrowed'],numParse(this.value))"></div>
           <div class="fxrow"><label style="min-width:130px">Owner — คืนไปแล้ว</label><input type="text" inputmode="decimal" class="fxamt" ${c.ownerLoan.linked?'disabled':''} value="${numFmt(c.ownerLoan.returned||0)}" onchange="editField(['construction','ownerLoan','returned'],numParse(this.value))"></div>
           <div style="font-size:13px;color:var(--muted)">คงค้าง Owner = <b>${fmt((+c.ownerLoan.borrowed||0)-(+c.ownerLoan.returned||0))}</b> บาท</div>
-          ${c.sources.some(x=>x.link==='b1Hotel')?`<div style="font-size:13px;color:var(--muted);margin-top:4px">คงค้างโรงแรมบ่อวิน 1 = <b>${fmt(b1i.owed)}</b> บาท <span style="font-size:12px">(ต้องคืน ${fmt(b1i.hotelDrawn)} − คืนแล้ว ${fmt(b1i.repaid)})</span></div>`:''}
         </div>
         <div class="cbox" style="height:240px;margin-top:14px"><canvas id="srcPie"></canvas></div>
       </div>
@@ -1937,7 +1948,8 @@ function viewConsDetail(key){
   const unassignedUsed=s.uses.reduce((a,u)=>a+((!u.srcDraw)?(+u.amount||0):0),0);
   const usedByDrawTotal=Object.values(usedByDraw).reduce((a,v)=>a+v,0);
   // --- การคืนเงินให้ผู้ให้ยืม (เฉพาะแท็บเงินยืม: บ่อวิน 1 / Owner) ---
-  const isB1=key==='bowin1';   // ส่วน "คืนเงิน" ใช้เฉพาะแท็บเงินยืมบ่อวิน 1 (แท็บ Owner บันทึกการคืนไว้ในตาราง ② อยู่แล้ว)
+  // 20 ต.ค. 2026: ผู้ใช้ขอให้แท็บเงินยืมบ่อวิน 1 กลับเป็นหน้าเดิม (ยอดบ่อวินยืมเงินก่อสร้าง ไปอยู่ในแท็บโรงแรมยืมก่อสร้างแทน)
+  const isB1=false;   // ส่วน "คืนเงิน" ใช้เฉพาะแท็บเงินยืมบ่อวิน 1 (แท็บ Owner บันทึกการคืนไว้ในตาราง ② อยู่แล้ว)
   // เงิน Owner ที่ผ่านแท็บนี้ ไม่นับเป็นยอดที่ต้องคืนโรงแรม (การคืน Owner บันทึกที่แท็บเงินยืม Owner ที่เดียว)
   // คืนแล้ว = รายการประเภท "คืนบ่อวิน 1" ในแท็บแบงก์ (ดึงมาเอง) + รายการคืนจากเงินก้อนอื่นที่กรอกในตารางนี้
   const b1=isB1?b1RepayInfo():{manual:[],bankRows:[],repaid:0,ownerDrawn:0};
@@ -1999,11 +2011,11 @@ function viewConsDetail(key){
   const bankUseTotal=Object.values(useByCat).reduce((a,v)=>a+v,0);
   const CAT_LABEL={owner:'Owner',hotel:'โรงแรม',repayB1:'คืนบ่อวิน 1',construction:'ก่อสร้าง',other:'อื่นๆ'};
   // แถบแยกว่า "จ่ายจริง" ก้อนนี้ ใครดึงไปใช้บ้าง — ไม่ใช่ค่าก่อสร้างบ่อวิน 2 ทั้งหมด
-  const SPLIT_ORDER=['construction','hotel','repayB1','owner','other'];
+  const SPLIT_ORDER=['construction','hotel','owner','other'];
   const SPLIT_LABEL={construction:'ก่อสร้างบ่อวิน 2',hotel:'โรงแรมอื่นยืมไป',repayB1:'คืนเงินยืมบ่อวิน 1',owner:'Owner ดึงไป',other:'อื่นๆ/ไม่ระบุ'};
   const SPLIT_COLOR={construction:'#1b7a4b',hotel:'#c8901f',repayB1:'#2f8f83',owner:'#243f66',other:'#8a857a'};
   const catOptsHtml=(cur)=>['<option value="">– ไม่ระบุ</option>']
-    .concat(['owner','hotel',...(isBank?['repayB1']:[]),'construction','other'].map(v=>`<option value="${v}" ${cur===v?'selected':''}>${CAT_LABEL[v]}</option>`)).join('');
+    .concat(['owner','hotel','construction','other'].map(v=>`<option value="${v}" ${cur===v?'selected':''}>${CAT_LABEL[v]}</option>`)).join('');
   const drawOptsHtml=(cur)=>['<option value="">–</option>']
     .concat(s.draws.map((d,i)=>`<option value="${d.id}" ${cur===d.id?'selected':''}>งวด ${i+1}</option>`)).join('');
   const drawRows=s.draws.length? s.draws.map((d,i)=>{
@@ -2132,7 +2144,7 @@ function viewConsDetail(key){
       </table></div>
       <button class="mini primary" style="margin-top:10px" onclick="addConsDraw('${key}')">➕ เพิ่มงวดเบิก</button>
       <h3 style="font-size:15px;margin:22px 0 8px">② การใช้เงิน (ใช้อะไรไปบ้าง)</h3>
-      <p class="hint" style="margin:0 0 8px">ระบุได้ว่าใช้เงินจากงวดเบิกไหน และผู้ใช้เป็น Owner / โรงแรม / ก่อสร้าง — ถ้าเป็นการยืมชั่วคราว (เช่นโรงแรมขอยืมไปใช้ก่อน) ให้ใส่วันครบกำหนดคืนด้วย${isBank?' · <b>จ่ายคืนเงินยืมโรงแรมบ่อวิน 1</b> ให้เลือกประเภท "คืนบ่อวิน 1" — ยอดจะไปขึ้นที่แท็บเงินยืมบ่อวิน 1 เอง ไม่ต้องกรอกซ้ำ · ประเภท <b>"โรงแรม"</b> = โรงแรมยืมเงินก่อสร้าง จะไปขึ้นที่แท็บ 🏨 โรงแรมยืมก่อสร้าง':''}${unassignedUsed?` · <b style="color:var(--neg)">ยังไม่ระบุงวด ${fmt(unassignedUsed)} บาท</b>`:''}</p>
+      <p class="hint" style="margin:0 0 8px">ระบุได้ว่าใช้เงินจากงวดเบิกไหน และผู้ใช้เป็น Owner / โรงแรม / ก่อสร้าง — ถ้าเป็นการยืมชั่วคราว (เช่นโรงแรมขอยืมไปใช้ก่อน) ให้ใส่วันครบกำหนดคืนด้วย${isBank?' · ประเภท <b>"โรงแรม"</b> = โรงแรมยืมเงินก่อสร้าง จะไปขึ้นที่แท็บ 🏨 โรงแรมยืมก่อสร้าง':''}${unassignedUsed?` · <b style="color:var(--neg)">ยังไม่ระบุงวด ${fmt(unassignedUsed)} บาท</b>`:''}</p>
       <div class="tblwrap"><table>
         <thead><tr><th>วันที่</th><th style="text-align:left">รายการที่ใช้</th><th>ยอด</th><th>ใช้จากงวด</th><th>ผู้ใช้/ประเภท</th><th>กำหนดคืนเงิน</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
         <tbody>${useRows}<tr class="total"><td colspan="2">รวมใช้เงิน</td><td>${fmt(used)}</td><td colspan="5" style="text-align:left;font-weight:400;font-size:12px;color:var(--muted)">${isBank?`ตัดเงินสดก้อนนี้ (ก่อน ${b2OpenLbl}) ${fmt(usedPreOpen)} บาท · ไปตัด GOP บ่อวิน 2 ${fmt(usedPostOpen)} บาท`:''}</td></tr></tbody>
@@ -2150,21 +2162,35 @@ function viewHotelLoan(){
   const mil=(x)=>(x/1e6).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+' ล้าน';
   const pct=hl.lent>0?Math.min(100,Math.max(0,hl.repaid/hl.lent*100)):0;
   const dates=hl.repays.map(r=>r.date||'').filter(Boolean).sort(); const last=dates.length?dates[dates.length-1]:'';
-  const bOpts=(cur)=>HL_BLDGS.map(k=>`<option value="${k}" ${cur===k?'selected':''}>${escHtml(hlBldgName(k))}</option>`).join('');
-  const ks=HL_BLDGS.filter(k=>hl.by[k].lent||hl.by[k].repaid);
-  const sumRows=ks.length? ks.map(k=>{ const b=hl.by[k], ow=b.lent-b.repaid, pc=b.lent>0?Math.min(100,b.repaid/b.lent*100):0;
-      return `<tr><td style="text-align:left"><b>${escHtml(hlBldgName(k))}</b></td><td>${fmt(b.lent)}</td><td style="color:var(--pos)">${fmt(b.repaid)}</td>
+  const bOpts=(cur)=>hlBldgArr().map(x=>`<option value="${x.id}" ${cur===x.id?'selected':''}>${escHtml(x.name||'(ไม่มีชื่อ)')}</option>`).join('');
+  const editMode=canEdit && !presentMode;
+  const ks=Object.keys(hl.by).filter(k=>hl.by[k].lent||hl.by[k].repaid);
+  const showKs=editMode? hlBldgIds() : ks;   // โหมดกรอกข้อมูล: แสดงทุกตึกเพื่อแก้ชื่อ/ลบ · โหมดนำเสนอ: เฉพาะตึกที่มียอด
+  const drawOpts=(cur)=>['<option value="">–</option>'].concat(((state.consDetail.bank.draws)||[]).map((d,i)=>`<option value="${d.id}" ${cur===d.id?'selected':''}>งวด ${i+1}</option>`)).join('');
+  const sumRows=showKs.length? showKs.map(k=>{ const b=hl.by[k]||{lent:0,repaid:0}, ow=b.lent-b.repaid, pc=b.lent>0?Math.min(100,b.repaid/b.lent*100):0;
+      const nameCell=(editMode && k!=='other')
+        ? `<div style="display:flex;gap:6px;align-items:center"><input class="cell" style="width:230px;text-align:left;font-weight:700" value="${escHtml(hlBldgName(k))}" onchange="renameHlBldg('${k}',this.value)"><button class="mini danger" title="ลบตึกนี้ (รายการของตึกนี้จะย้ายไป &quot;ไม่ระบุตึก&quot;)" onclick="delHlBldg('${k}')">ลบ</button></div>`
+        : `<b>${escHtml(hlBldgName(k))}</b>`;
+      return `<tr><td style="text-align:left">${nameCell}</td><td>${fmt(b.lent)}</td><td style="color:var(--pos)">${fmt(b.repaid)}</td>
         <td style="color:${ow>0?'var(--neg)':'var(--pos)'}"><b>${fmt(ow)}</b></td>
         <td style="min-width:120px"><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:8px;border-radius:4px;background:#e3ece6;overflow:hidden"><div style="height:100%;width:${pc.toFixed(1)}%;background:var(--pos)"></div></div><span style="font-size:12px;color:var(--muted)">${pc.toFixed(0)}%</span></div></td></tr>`; }).join('')
     : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มีรายการที่โรงแรมยืม</td></tr>`;
-  const loanRows=hl.loans.length? hl.loans.slice().sort((a,b)=>ymdToNum(a.date)-ymdToNum(b.date)).map(u=>{ const picked=!!(u.bldg&&HL_BLDGS.includes(u.bldg));
-      return `<tr><td>${u.date?fmtDate(u.date):'–'}</td><td style="text-align:left">${escHtml(u.item||'')}</td><td>${fmt(+u.amount||0)}</td>
+  const addBldgRow=editMode?`<div class="edit-only" style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <input id="hlNewBldg" class="cell" style="width:260px;text-align:left" placeholder="ชื่อตึก/โรงแรมใหม่ เช่น กุญชร อพาร์ทเม้นท์" onkeydown="if(event.key==='Enter')addHlBldg()">
+      <button class="mini primary" onclick="addHlBldg()">➕ เพิ่มตึก/โรงแรม</button>
+      <span class="hint" style="margin:0">ลบตึกแล้ว รายการของตึกนั้นจะย้ายไป "ไม่ระบุตึก" (ยอดไม่หาย)</span></div>`:'';
+  const loanRows=hl.loans.length? hl.loans.slice().sort((a,b)=>ymdToNum(a.date)-ymdToNum(b.date)).map(u=>{ const picked=!!(u.bldg&&hlBldgIds().includes(u.bldg));
+      return `<tr>
+        <td><input class="cell" type="date" style="width:120px" value="${u.date||''}" onchange="editHotelLoan('${u.id}','date',this.value)"></td>
+        <td style="text-align:left"><input class="cell" style="width:230px;text-align:left" value="${escHtml(u.item)}" placeholder="ยืมไปทำอะไร เช่น เงินกู้ BBL Prime ต.ค." onchange="editHotelLoan('${u.id}','item',this.value)"></td>
+        <td><input class="cell" style="width:110px" value="${numFmt(u.amount||0)}" onchange="editHotelLoan('${u.id}','amount',this.value)"></td>
         <td><select class="cell" style="padding:5px 2px;width:190px" onchange="setHotelLoanBldg('${u.id}',this.value)">${bOpts(hlBldgOf(u))}</select>${picked?'':'<div style="font-size:11px;color:var(--muted);margin-top:2px">ระบบเดาจากชื่อ — เปลี่ยนได้</div>'}</td>
-        <td style="color:var(--muted)">${u.repayDate?fmtDate(u.repayDate):'–'}</td></tr>`; }).join('')
-    : `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มี — รายการในแท็บแบงก์ที่เลือกประเภท "โรงแรม" จะมาขึ้นที่นี่</td></tr>`;
+        <td><select class="cell" style="padding:5px 2px;width:78px" onchange="editHotelLoan('${u.id}','srcDraw',this.value)">${drawOpts(u.srcDraw||'')}</select></td>
+        <td><button class="mini danger" onclick="delHotelLoan('${u.id}')">ลบ</button></td></tr>`; }).join('')
+    : `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:12px">ยังไม่มี — กด "➕ เพิ่มรายการที่โรงแรมยืม"</td></tr>`;
   const repRows=hl.repays.length? hl.repays.map((r,i)=>`<tr>
       <td><input class="cell" type="date" style="width:120px" value="${r.date||''}" onchange="editHotelRepay(${i},'date',this.value)"></td>
-      <td><select class="cell" style="padding:5px 2px;width:190px" onchange="editHotelRepay(${i},'bldg',this.value)"><option value="" ${!r.bldg?'selected':''}>– เลือกตึก</option>${bOpts(r.bldg||'')}</select></td>
+      <td><select class="cell" style="padding:5px 2px;width:190px" onchange="editHotelRepay(${i},'bldg',this.value)"><option value="" ${!r.bldg?'selected':''}>– เลือกตึก</option>${bOpts(r.bldg&&hlBldgIds().includes(r.bldg)?r.bldg:(r.bldg?'other':''))}</select></td>
       <td style="text-align:left"><input class="cell" style="width:240px;text-align:left" value="${escHtml(r.item)}" placeholder="เช่น คืนเงินกู้ Prime ที่ยืมไป ก.ย." onchange="editHotelRepay(${i},'item',this.value)"></td>
       <td><input class="cell" style="width:120px;color:var(--pos);font-weight:700" value="${numFmt(r.amount||0)}" onchange="editHotelRepay(${i},'amount',this.value)"></td>
       <td style="text-align:left"><input class="cell" style="width:160px;text-align:left" value="${escHtml(r.note)}" placeholder="เลขที่โอน / อ้างอิง" onchange="editHotelRepay(${i},'note',this.value)"></td>
@@ -2174,7 +2200,7 @@ function viewHotelLoan(){
   return `<div class="card">
     ${consSubNav()}
     <h2>🏨 โรงแรมยืมเงินก่อสร้าง</h2>
-    <p class="hint">เงินก่อสร้าง (แบงก์ 70 ล้าน) ที่โรงแรมยืมไปใช้ และต้องคืนให้ก่อสร้าง — รายการที่โรงแรมยืมดึงจากแท็บแบงก์ (ประเภท "โรงแรม") อัตโนมัติ · เมื่อโรงแรมคืนเงิน กรอกที่ตาราง ③ เงินสดในมือของก่อสร้างจะเพิ่มขึ้นตาม</p>
+    <p class="hint">เงินก่อสร้าง (แบงก์ 70 ล้าน) ที่โรงแรมยืมไปใช้ และต้องคืนให้ก่อสร้าง · รายการยืมกรอกที่ตาราง ② (ใช้ข้อมูลชุดเดียวกับแท็บแบงก์) · เมื่อโรงแรมคืนเงิน กรอกที่ตาราง ③ เงินสดในมือของก่อสร้างจะเพิ่มขึ้นตาม</p>
     <div style="margin:4px 0 14px;padding:14px 18px;border-radius:12px;background:#fff;border:1px solid #e8e0cf;font-size:17px;line-height:1.7;color:var(--ink)">
       โรงแรมยืมเงินก่อสร้างไป <b>${mil(hl.lent)}</b>
       <span style="color:var(--muted)">→</span> คืนแล้ว <b style="color:var(--pos)">${mil(hl.repaid)}</b>
@@ -2190,12 +2216,15 @@ function viewHotelLoan(){
       <thead><tr><th style="text-align:left">ตึก</th><th>ยืมไป</th><th>คืนแล้ว</th><th>ยังค้างคืน</th><th>คืนแล้ว %</th></tr></thead>
       <tbody>${sumRows}<tr class="total"><td style="text-align:left">รวม</td><td>${fmt(hl.lent)}</td><td style="color:var(--pos)">${fmt(hl.repaid)}</td><td><b>${fmt(hl.owed)}</b></td><td>${pct.toFixed(0)}%</td></tr></tbody>
     </table></div>
+    ${addBldgRow}
     ${ks.length?`<div class="chartcard" style="margin-top:12px"><div class="ct">📊 แต่ละตึก — คืนแล้ว vs ยังค้าง</div><div class="cbox" style="height:${Math.max(140,ks.length*48+50)}px"><canvas id="hlBldgChart"></canvas></div></div>`:''}
-    <h3 style="font-size:15px;margin:22px 0 8px">② รายการที่โรงแรมยืมไป <span style="font-weight:400;font-size:12.5px;color:var(--muted)">(ดึงจากแท็บแบงก์ 70 ล้าน — แก้ยอด/วันที่ที่แท็บนั้น · ช่องตึกเลือกได้ที่นี่)</span></h3>
+    <h3 style="font-size:15px;margin:22px 0 8px">② รายการที่โรงแรมยืมไป</h3>
+    <p class="hint" style="margin:0 0 8px">เป็นรายการชุดเดียวกับแท็บ "แบงก์ 70 ล้าน" ประเภท "โรงแรม" — เพิ่ม/แก้/ลบที่นี่ หรือที่แท็บแบงก์ก็ได้ ตัวเลขตรงกันเสมอ และเงินสดในมือของแบงก์ลดตามยอดที่ยืม</p>
     <div class="tblwrap"><table>
-      <thead><tr><th>วันที่</th><th style="text-align:left">รายการ</th><th>ยอดที่ยืม</th><th>ตึก</th><th>กำหนดคืน</th></tr></thead>
-      <tbody>${loanRows}<tr class="total"><td colspan="2" style="text-align:left">รวมยืมไป</td><td>${fmt(hl.lent)}</td><td colspan="2"></td></tr></tbody>
+      <thead><tr><th>วันที่</th><th style="text-align:left">รายการ</th><th>ยอดที่ยืม</th><th>ตึก/โรงแรม</th><th>ใช้จากงวด</th><th></th></tr></thead>
+      <tbody>${loanRows}<tr class="total"><td colspan="2" style="text-align:left">รวมยืมไป</td><td>${fmt(hl.lent)}</td><td colspan="3"></td></tr></tbody>
     </table></div>
+    <button class="mini primary edit-only" style="margin-top:10px" onclick="addHotelLoan()">➕ เพิ่มรายการที่โรงแรมยืม</button>
     <h3 style="font-size:15px;margin:22px 0 8px">③ โรงแรมคืนเงินให้ก่อสร้าง</h3>
     <p class="hint" style="margin:0 0 8px">กรอกทุกครั้งที่โรงแรมโอนเงินคืนเข้าบัญชีก่อสร้าง — ยอดนี้จะบวกกลับเข้า "เงินสดคงเหลือในมือ" ของแท็บแบงก์ และขึ้นเป็นแหล่งเงินในหน้าภาพรวม${noBldg?` · <b style="color:var(--neg)">ยังไม่เลือกตึก ${noBldg} รายการ</b>`:''}</p>
     <div class="tblwrap"><table>
@@ -3148,6 +3177,16 @@ function editConsUse(key,i,field,val){ if(ro())return; const u=state.consDetail[
 function addHotelRepay(){ if(ro())return; const b=state.consDetail.bank; if(!Array.isArray(b.hotelRepays)) b.hotelRepays=[]; b.hotelRepays.push({id:'hr'+Date.now(),date:todayStr(),bldg:'',amount:0,item:'',note:''}); save(); render(); }
 function editHotelRepay(i,field,val){ if(ro())return; const r=(state.consDetail.bank.hotelRepays||[])[i]; if(!r)return; r[field]=(field==='amount')?numParse(val):val; save(); render(); }
 function delHotelRepay(i){ if(ro())return; state.consDetail.bank.hotelRepays.splice(i,1); save(); render(); }
+function addHlBldg(){ if(ro())return; const el=document.getElementById('hlNewBldg'); const name=((el&&el.value)||'').trim(); if(!name){ toast('พิมพ์ชื่อตึก/โรงแรมก่อน แล้วกดเพิ่ม'); return; }
+  const arr=state.consDetail.bank.hlBldgs; const oi=arr.findIndex(x=>x.id==='other'); arr.splice(oi<0?arr.length:oi,0,{id:'b'+Date.now(),name}); save(); render(); }
+function renameHlBldg(id,val){ if(ro())return; const x=state.consDetail.bank.hlBldgs.find(b=>b.id===id); if(!x)return; x.name=(val||'').trim()||x.name; save(); render(); }
+function delHlBldg(id){ if(ro()||id==='other')return; const b=state.consDetail.bank; const n=(b.uses||[]).filter(u=>u.category==='hotel'&&hlBldgOf(u)===id).length+(b.hotelRepays||[]).filter(r=>r.bldg===id).length;
+  (b.uses||[]).forEach(u=>{ if(u.category==='hotel'&&hlBldgOf(u)===id) u.bldg='other'; }); (b.hotelRepays||[]).forEach(r=>{ if(r.bldg===id) r.bldg='other'; });
+  b.hlBldgs=b.hlBldgs.filter(x=>x.id!==id); save(); render(); if(n) toast('ลบตึกแล้ว — ย้าย '+n+' รายการไปที่ "ไม่ระบุตึก"'); }
+// รายการที่โรงแรมยืม = รายการในแท็บแบงก์ ประเภท "โรงแรม" (ข้อมูลชุดเดียวกัน แก้ที่ไหนก็ตรงกันทั้งสองแท็บ)
+function addHotelLoan(){ if(ro())return; state.consDetail.bank.uses.push({id:'us'+Date.now(),date:todayStr(),item:'',amount:0,note:'',srcDraw:'',category:'hotel',bldg:'',repayDate:'',repaid:false}); save(); render(); }
+function editHotelLoan(id,field,val){ if(ro())return; const u=(state.consDetail.bank.uses||[]).find(x=>x.id===id); if(!u)return; u[field]=(field==='amount')?numParse(val):val; save(); render(); }
+function delHotelLoan(id){ if(ro())return; const b=state.consDetail.bank; b.uses=(b.uses||[]).filter(x=>x.id!==id); save(); render(); }
 function setHotelLoanBldg(useId,val){ if(ro())return; const u=(state.consDetail.bank.uses||[]).find(x=>x.id===useId); if(!u)return; u.bldg=val; save(); render(); }
 function addConsRepay(key){ if(ro())return; const s=state.consDetail[key]; if(!Array.isArray(s.repays)) s.repays=[]; s.repays.push({id:'rp'+Date.now(),date:todayStr(),item:'',amount:0,via:'',note:''}); save(); render(); }
 function editConsRepay(key,i,field,val){ if(ro())return; const r=(state.consDetail[key].repays||[])[i]; if(!r)return; r[field]=(field==='amount')?numParse(val):val; save(); render(); }
@@ -3286,7 +3325,7 @@ function drawCharts(){
       charts.fcs=new Chart(document.getElementById('fcSummaryBarChart'),{type:'bar',data:{labels:months.map(monthKeyLabel),datasets:[{label:'คาดการณ์',data:months.map(k=>fcTotals[k]),backgroundColor:'#c8901f'}]},plugins:[barValueLabelPlugin],options:{layout:{padding:{top:22}},plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{y:{grace:'15%',ticks:{callback:v=>fmt(v)}}}}});
   }
   if(currentTab==='construction' && consSub==='hotelloan'){
-    const hl=hotelLoanInfo(); const ks=HL_BLDGS.filter(k=>hl.by[k].lent||hl.by[k].repaid);
+    const hl=hotelLoanInfo(); const ks=Object.keys(hl.by).filter(k=>hl.by[k].lent||hl.by[k].repaid);
     if(document.getElementById('hlBldgChart') && ks.length)
       charts.hl=new Chart(document.getElementById('hlBldgChart'),{type:'bar',data:{labels:ks.map(hlBldgName),datasets:[
         {label:'คืนแล้ว',data:ks.map(k=>Math.min(hl.by[k].repaid,hl.by[k].lent)),backgroundColor:'#1b7a4b',stack:'a',maxBarThickness:34},
@@ -3318,7 +3357,7 @@ function drawCharts(){
     }
     if(document.getElementById('consUtilChart')){
       let labels,data,colors;
-      if(consSub==='bowin1'){ const bi=b1RepayInfo(); labels=['คืนแล้ว','ยังค้างคืน']; data=[Math.max(0,Math.min(bi.repaid,bi.hotelDrawn)),Math.max(0,bi.hotelDrawn-bi.repaid)]; colors=['#1b7a4b','#c0392b']; }
+      if(false){ const bi=b1RepayInfo(); labels=['คืนแล้ว','ยังค้างคืน']; data=[Math.max(0,Math.min(bi.repaid,bi.hotelDrawn)),Math.max(0,bi.hotelDrawn-bi.repaid)]; colors=['#1b7a4b','#c0392b']; }
       else if(credit>0){ labels=['เบิกแล้ว','วงเงินคงเหลือ (ยังเบิกได้)']; data=[Math.min(drawn,credit),Math.max(0,credit-drawn)]; colors=['#243f66','#e4ddce']; }
       else { labels=['ใช้จ่ายไปแล้ว','เงินคงเหลือในมือ']; data=[used,Math.max(0,drawn-used)]; colors=['#c0392b','#1b7a4b']; }
       if(data.some(x=>x>0))
