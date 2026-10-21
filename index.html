@@ -716,10 +716,10 @@ function migrate(){
   if(Array.isArray(state.construction.uses)) state.construction.uses=state.construction.uses.filter(u=>u.link!=='bankRepayB1');
   if(!state._migHotelLoan){
     const c=state.construction;
-    if((c.sources||[]).some(x=>x.link==='bankDrawn') && !c.sources.some(x=>x.link==='hotelRepaid'))
-      c.sources.push({id:'s_hotelRepay',name:'โรงแรมคืนเงินให้ก่อสร้าง',amount:0,link:'hotelRepaid'});
     state._migHotelLoan=1;
   }
+  // 21 ต.ค. 2026: ยอดตาราง ③ ไม่ใช่แหล่งเงินเข้า → เอาออกจากแหล่งเงินหน้าภาพรวม
+  if(Array.isArray(state.construction.sources)) state.construction.sources=state.construction.sources.filter(x=>x.link!=='hotelRepaid');
   // ---- โมดูลใหม่: Forecast รายการจ่ายโครงการบ่อวิน 2 (ยอดคาดการณ์เท่านั้น ไม่เชื่อมกับยอดอื่น) ----
   if(!Array.isArray(state.consForecast)) state.consForecast=JSON.parse(JSON.stringify(CONS_FORECAST_SEED));
   state.consForecast.forEach(it=>{
@@ -1913,9 +1913,10 @@ function viewConsDetail(key){
   const isPostOpenUse=(u)=>{ const m=(u.date||'').slice(0,7); return !!m && m>=B2_OPEN; };
   const usedPostOpen=isBank? s.uses.reduce((a,u)=>a+(isPostOpenUse(u)?(+u.amount||0):0),0) : 0;
   const usedPreOpen=used-usedPostOpen;
-  // โรงแรมคืนเงินให้ก่อสร้าง → เงินกลับเข้าก้อนแบงก์ (เฉพาะแท็บแบงก์)
+  // 21 ต.ค. 2026: เงินที่โรงแรมคืนให้ก่อสร้าง (ตาราง ③) ไม่ผูกเข้ายอดแบงก์ 70 ล้าน
+  // ถ้าบวกเข้า ยอดรวมฝั่งแบงก์จะเกิน 70 ล้าน/เกินเงินสดจริง → แสดงเป็นข้อมูลอย่างเดียว
   const hotelBack=isBank?hotelLoanInfo().repaid:0;
-  const cashInHand=drawn-usedPreOpen+hotelBack;
+  const cashInHand=drawn-usedPreOpen;
   const THM=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const thMonth=(ym)=>ym?(THM[parseInt(ym.slice(5,7),10)-1]+' '+ym.slice(0,4)):'';
   const b2OpenLbl=thMonth(B2_OPEN);
@@ -1991,7 +1992,7 @@ function viewConsDetail(key){
       <div class="box" style="border-left-color:var(--navy2)"><div class="lbl">เบิก/รับเข้ามาแล้วรวม</div><div class="val">${fmt(drawn)}</div><div class="cap">บาท</div></div>
       ${(+s.creditLine||0)>0?`<div class="box" style="border-left-color:var(--gold)"><div class="lbl">วงเงินคงเหลือ (ยังเบิกได้)</div><div class="val" style="color:${creditLeft>=0?'var(--pos)':'var(--neg)'}">${fmt(creditLeft)}</div><div class="cap">วงเงิน − เบิกแล้ว</div></div>`:''}
       <div class="box" style="border-left-color:var(--neg)"><div class="lbl">${isBank?'จ่ายจริงไปแล้ว':'ใช้จ่ายไปแล้วรวม'}</div><div class="val" style="color:var(--neg)">${fmt(used)}</div><div class="cap">${isBank?(lastUseMonth?`ตัดเงินสดก้อนนี้แล้ว · ถึง ${thMonth(lastUseMonth)}`:'ตัดเงินสดก้อนนี้แล้ว'):'บาท'}</div></div>
-      <div class="box" style="border-left-color:var(--pos)"><div class="lbl">💰 เงินสดคงเหลือในมือ</div><div class="val" style="color:${cashInHand>=0?'var(--pos)':'var(--neg)'}">${fmt(cashInHand)}</div><div class="cap">${hotelBack?`เบิก − จ่ายจริง + โรงแรมคืน ${fmt(hotelBack)}`:'เบิกเข้ามา − จ่ายจริง'}</div></div>
+      <div class="box" style="border-left-color:var(--pos)"><div class="lbl">💰 เงินสดคงเหลือในมือ</div><div class="val" style="color:${cashInHand>=0?'var(--pos)':'var(--neg)'}">${fmt(cashInHand)}</div><div class="cap">เบิกเข้ามา − จ่ายจริง</div></div>
     </div>
     ${(isBank&&bankUseTotal>0)?`<div class="growthbox" style="display:block;background:#fbf9f4;border-color:#e8e0cf;margin-top:2px">
       <div style="font-size:12.5px;color:#6b5426;margin-bottom:7px"><b>จ่ายจริง ${fmt(bankUseTotal)} บาท — แยกว่าใครดึงไปใช้</b> <span style="color:var(--muted);font-weight:400">(ไม่ใช่ค่าก่อสร้างบ่อวิน 2 ทั้งก้อน)</span></div>
@@ -2006,7 +2007,7 @@ function viewConsDetail(key){
           <span style="color:var(--muted)">(${Math.round(useByCat[c]/bankUseTotal*100)}%)</span>
         </div>`:'').join('')}
       </div>
-      ${useByCat.hotel>0?`<p class="hint" style="margin:8px 0 0">🏨 โรงแรมยืมไป ${fmt(useByCat.hotel)} บาท · คืนกลับมาแล้ว <b style="color:var(--pos)">${fmt(hotelBack)}</b> · ยังค้าง <b style="color:var(--neg)">${fmt(hotelLoanInfo().owed)}</b> — <a href="#" onclick="setConsSub('hotelloan');return false">ดูรายละเอียดแยกตึก →</a></p>`:''}
+      ${useByCat.hotel>0?`<p class="hint" style="margin:8px 0 0">🏨 โรงแรมยืมไป ${fmt(useByCat.hotel)} บาท · คืนกลับมาแล้ว <b style="color:var(--pos)">${fmt(hotelBack)}</b> <span style="color:var(--muted)">(ไม่นับรวมในยอดแบงก์ 70 ล้าน)</span> · ยังค้าง <b style="color:var(--neg)">${fmt(hotelLoanInfo().owed)}</b> — <a href="#" onclick="setConsSub('hotelloan');return false">ดูรายละเอียดแยกตึก →</a></p>`:''}
       ${bankUseTotal>drawn?`<p class="hint" style="color:var(--neg);margin:8px 0 0">⚠️ ยอดใช้เงินที่บันทึกไว้ (${fmt(bankUseTotal)}) มากกว่ายอดที่เบิกจริง (${fmt(drawn)}) — ลองตรวจสอบรายการด้านล่างอีกครั้ง</p>`:''}
     </div>`:''}
     ${isBank?`<div style="margin-top:10px;border:1.5px dashed #b9c4d6;border-radius:12px;background:#f5f7fb;padding:12px 14px">
@@ -2150,7 +2151,7 @@ function viewHotelLoan(){
     </table></div>
     <button class="mini primary edit-only" style="margin-top:10px" onclick="addHotelLoan()">➕ เพิ่มรายการที่โรงแรมยืม</button>
     <h3 style="font-size:15px;margin:22px 0 8px">③ โรงแรมคืนเงินให้ก่อสร้าง</h3>
-    <p class="hint" style="margin:0 0 8px">กรอกทุกครั้งที่โรงแรมโอนเงินคืนเข้าบัญชีก่อสร้าง — ยอดนี้จะบวกกลับเข้า "เงินสดคงเหลือในมือ" ของแท็บแบงก์ และขึ้นเป็นแหล่งเงินในหน้าภาพรวม${noBldg?` · <b style="color:var(--neg)">ยังไม่เลือกตึก ${noBldg} รายการ</b>`:''}</p>
+    <p class="hint" style="margin:0 0 8px">กรอกทุกครั้งที่โรงแรมโอนเงินคืนเข้าบัญชีก่อสร้าง — ยอดนี้ไม่ผูกเข้ายอดแบงก์ 70 ล้าน (ไม่บวกเข้า "เงินสดคงเหลือในมือ" และไม่นับเป็นแหล่งเงินในหน้าภาพรวม) เพื่อไม่ให้ยอดฝั่งแบงก์เกิน 70 ล้าน${noBldg?` · <b style="color:var(--neg)">ยังไม่เลือกตึก ${noBldg} รายการ</b>`:''}</p>
     <div class="tblwrap"><table>
       <thead><tr><th>วันที่คืน</th><th>ตึก</th><th style="text-align:left">รายละเอียด</th><th>ยอดที่คืน</th><th style="text-align:left">หมายเหตุ</th><th></th></tr></thead>
       <tbody>${repRows}<tr class="total"><td colspan="3" style="text-align:left">รวมคืนแล้ว</td><td style="color:var(--pos)">${fmt(hl.repaid)}</td><td colspan="2" style="text-align:left;font-weight:400;font-size:12px;color:var(--muted)">ยังค้าง ${fmt(hl.owed)} บาท</td></tr></tbody>
@@ -3209,7 +3210,6 @@ if(window.Chart){
 function consDetailChartData(s,isBank){
   const evs=[];
   (s.draws||[]).forEach(d=>{ if((+d.amount||0)!==0) evs.push({date:d.date||'',draw:+d.amount||0,use:0}); });
-  if(isBank) (s.hotelRepays||[]).forEach(r=>{ if((+r.amount||0)!==0) evs.push({date:r.date||'',draw:+r.amount||0,use:0}); });
   // แท็บแบงก์: รายการตั้งแต่ ก.พ. 2027 ไปตัดที่ GOP บ่อวิน 2 → ไม่นำมาลดเส้นเงินสดในมือ
   (s.uses||[]).forEach(u=>{ if((+u.amount||0)===0) return;
     const m=(u.date||'').slice(0,7); if(isBank && m && m>=B2_OPEN) return;
